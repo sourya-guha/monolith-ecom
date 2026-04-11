@@ -6,7 +6,7 @@ const Order = require('../models/Order');
 exports.getProfile = async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password');
-    res.json({ success: true, user });
+    res.json({ success: true, data: user });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -31,7 +31,7 @@ exports.updateProfile = async (req, res) => {
 exports.getAllProducts = async (req, res) => {
   try {
     const products = await Product.find().populate('seller', 'name email');
-    res.json({ success: true, products });
+    res.json({ success: true, data: products });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -44,7 +44,7 @@ exports.getProduct = async (req, res) => {
     if (!product) {
       return res.status(404).json({ message: 'Product not found' });
     }
-    res.json({ success: true, product });
+    res.json({ success: true, data: product });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -72,7 +72,7 @@ exports.placeOrder = async (req, res) => {
       shippingAddress
     });
 
-    res.status(201).json({ success: true, order });
+    res.status(201).json({ success: true, data: order });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -83,7 +83,7 @@ exports.getMyOrders = async (req, res) => {
   try {
     const orders = await Order.find({ user: req.user.id })
       .populate('items.product', 'name price');
-    res.json({ success: true, orders });
+    res.json({ success: true, data: orders });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -108,7 +108,7 @@ exports.cancelOrder = async (req, res) => {
     order.status = 'cancelled';
     await order.save();
 
-    res.json({ success: true, order });
+    res.json({ success: true, data: order });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
