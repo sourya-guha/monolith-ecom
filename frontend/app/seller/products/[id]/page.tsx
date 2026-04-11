@@ -36,17 +36,10 @@ export default function EditProduct() {
   const [images, setImages] = useState<string[]>([]);
 
   useEffect(() => {
-    if (user && user.role === 'seller' && params.id) {
-      fetchProduct();
-    }
-  }, [user, params.id]);
-
-  const fetchProduct = async () => {
-    try {
-      const data = await sellerApi.getProducts() || [];
-      const foundProduct = (data || []).find((p: Product) => p._id === params.id);
-      if (foundProduct) {
-        setProduct(foundProduct);
+    const fetchProduct = async () => {
+      try {
+        const foundProduct:any = await sellerApi.getProduct(params.id as string);
+        setProduct(foundProduct as Product);
         setFormData({
           name: foundProduct.name,
           description: foundProduct.description,
@@ -55,16 +48,18 @@ export default function EditProduct() {
           stock: foundProduct.stock.toString(),
         });
         setImages(foundProduct?.images || []);
-      } else {
+      } catch (error) {
+        console.error('Failed to fetch product:', error);
         router.push('/seller/products');
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error('Failed to fetch product:', error);
-      router.push('/seller/products');
-    } finally {
-      setLoading(false);
+    };
+
+    if (user && user.role === 'seller' && params.id) {
+      fetchProduct();
     }
-  };
+  }, [user, params.id, router]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -122,7 +117,7 @@ export default function EditProduct() {
         <div className="text-center">
           <div className="text-6xl mb-4">🚫</div>
           <h2 className="text-2xl font-bold text-gray-800 mb-2">Access Denied</h2>
-          <p className="text-gray-600">You don't have permission to access this page.</p>
+          <p className="text-gray-600">You don&apos;t have permission to access this page.</p>
         </div>
       </div>
     );
@@ -142,7 +137,7 @@ export default function EditProduct() {
         <div className="text-center">
           <div className="text-6xl mb-4">❌</div>
           <h2 className="text-2xl font-bold text-gray-800 mb-2">Product Not Found</h2>
-          <p className="text-gray-600">The product you're trying to edit doesn't exist.</p>
+          <p className="text-gray-600">The product you&apos;re trying to edit doesn&apos;t exist.</p>
         </div>
       </div>
     );

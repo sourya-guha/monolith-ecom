@@ -23,7 +23,7 @@ export default function HomePage() {
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const products: any = await productApi.getAll();
+        const products = await productApi.getAll();
         // Show first 6 products as featured
         setFeaturedProducts((Array.isArray(products) ? products : []).slice(0, 6));
       } catch (error) {

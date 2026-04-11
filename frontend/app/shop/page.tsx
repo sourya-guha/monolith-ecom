@@ -28,10 +28,10 @@ export default function ShopPage() {
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const data = await userApi.getProducts() as any;
-const productList: Product[] = Array.isArray(data) ? data : data?.products || data?.data || [];
-setProducts(productList);
-setFilteredProducts(productList);
+        const data = await userApi.getProducts();
+        const productList: Product[] = Array.isArray(data) ? data : [];
+        setProducts(productList);
+        setFilteredProducts(productList);
       } catch (error) {
         console.error('Failed to fetch products:', error);
       } finally {

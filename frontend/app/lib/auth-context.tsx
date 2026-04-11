@@ -1,11 +1,13 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { normalizeUser } from './api';
 
 interface User {
   id: string;
   firstName: string;
   lastName: string;
+  name: string;
   email: string;
   role: 'user' | 'seller' | 'admin';
 }
@@ -50,12 +52,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     if (storedToken && storedUser) {
       const parsedUser = JSON.parse(storedUser);
-      // Ensure user has firstName and lastName, transform if necessary
-      const transformedUser = parsedUser.name ? {
-        ...parsedUser,
-        firstName: parsedUser.name.split(' ')[0] || '',
-        lastName: parsedUser.name.split(' ').slice(1).join(' ') || '',
-      } : parsedUser;
+      const transformedUser = normalizeUser(parsedUser) as User | null;
       setToken(storedToken);
       setUser(transformedUser);
     }
@@ -69,13 +66,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const response = await authApi.login(email, password);
 
       const { token: newToken, user: userData } = response;
-      
-      // Transform user data: split name into firstName and lastName
-      const transformedUser = {
-        ...userData,
-        firstName: userData.name.split(' ')[0] || '',
-        lastName: userData.name.split(' ').slice(1).join(' ') || '',
-      };
+      const transformedUser = normalizeUser(userData) as User;
       
       setToken(newToken);
       setUser(transformedUser);
@@ -107,13 +98,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const response = await authApi.register(userData);
 
       const { token: newToken, user: newUser } = response;
-      
-      // Transform user data: split name into firstName and lastName
-      const transformedUser = {
-        ...newUser,
-        firstName: newUser.name.split(' ')[0] || '',
-        lastName: newUser.name.split(' ').slice(1).join(' ') || '',
-      };
+      const transformedUser = normalizeUser(newUser) as User;
       
       setToken(newToken);
       setUser(transformedUser);

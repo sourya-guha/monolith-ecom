@@ -3,7 +3,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../lib/auth-context';
 import { adminApi } from '../../lib/api';
-import { Edit, Eye, Package } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,7 +26,7 @@ interface Order {
     state: string;
     pincode: string;
   };
-  totalAmount: number;
+  totalPrice: number;
   status: string;
   createdAt: string;
   user?: {
@@ -50,8 +49,8 @@ export default function AdminOrders() {
 
   const fetchOrders = async () => {
     try {
-      const data: any = await adminApi.getOrders();
-      setOrders(data || []);
+      const data = await adminApi.getOrders();
+      setOrders(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Failed to fetch orders:', error);
     } finally {
@@ -98,7 +97,7 @@ export default function AdminOrders() {
         <div className="text-center">
           <div className="text-6xl mb-4">🚫</div>
           <h2 className="text-2xl font-bold text-gray-800 mb-2">Access Denied</h2>
-          <p className="text-gray-600">You don't have permission to access this page.</p>
+          <p className="text-gray-600">You don&apos;t have permission to access this page.</p>
         </div>
       </div>
     );
@@ -210,7 +209,7 @@ export default function AdminOrders() {
                   </div>
                   <div className="text-right">
                     <p className="text-2xl font-bold text-blue-600">
-                      Total: ${order.totalAmount.toFixed(2)}
+                      Total: ${order.totalPrice.toFixed(2)}
                     </p>
                   </div>
                 </div>

@@ -9,6 +9,10 @@ import Link from 'next/link';
 
 export const dynamic = 'force-dynamic';
 
+interface Product {
+  _id: string;
+}
+
 export default function AddProduct() {
   const { user } = useAuth();
   const router = useRouter();
@@ -64,8 +68,8 @@ export default function AddProduct() {
         images: imageUrls,
       };
 
-      await sellerApi.createProduct(productData);
-      router.push('/seller/products');
+      const createdProduct = await sellerApi.createProduct(productData) as Product;
+      router.push(`/seller/products/${createdProduct._id}`);
     } catch (error) {
       console.error('Failed to create product:', error);
       alert('Failed to create product. Please try again.');

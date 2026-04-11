@@ -16,6 +16,10 @@ interface DashboardStats {
   totalRevenue: number;
 }
 
+interface AdminOrderSummary {
+  totalPrice: number;
+}
+
 export default function AdminDashboard() {
   const { user } = useAuth();
   const [stats, setStats] = useState<DashboardStats>({
@@ -42,7 +46,10 @@ export default function AdminDashboard() {
       const orders = await adminApi.getOrders() || [];
 
       // Calculate stats
-      const totalRevenue = (orders || []).reduce((sum: number, order: any) => sum + (order?.totalAmount || 0), 0);
+      const totalRevenue = (orders || []).reduce(
+        (sum: number, order: AdminOrderSummary) => sum + (order?.totalPrice || 0),
+        0
+      );
 
       setStats({
         totalUsers: (users || []).length,
@@ -64,7 +71,7 @@ export default function AdminDashboard() {
         <div className="text-center">
           <div className="text-6xl mb-4">🚫</div>
           <h2 className="text-2xl font-bold text-gray-800 mb-2">Access Denied</h2>
-          <p className="text-gray-600">You don't have permission to access this page.</p>
+          <p className="text-gray-600">You don&apos;t have permission to access this page.</p>
         </div>
       </div>
     );

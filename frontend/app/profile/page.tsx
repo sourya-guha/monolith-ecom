@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../lib/auth-context';
-import { userApi } from '../lib/api';
+import { normalizeUser, userApi } from '../lib/api';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,6 +23,9 @@ export default function ProfilePage() {
     lastName: '',
     email: '',
   });
+  const displayUser = profile
+    ? normalizeUser(profile)
+    : user;
 
   useEffect(() => {
     if (user) {
@@ -38,7 +41,7 @@ export default function ProfilePage() {
   const fetchProfile = async () => {
     try {
       const data = await userApi.getProfile();
-      setProfile(data as any);
+      setProfile(data as UserProfile);
     } catch (error) {
       console.error('Failed to fetch profile:', error);
     } finally {
@@ -59,10 +62,16 @@ export default function ProfilePage() {
     setUpdating(true);
 
     try {
-      await userApi.updateProfile(formData);
+      const updatedProfile = await userApi.updateProfile(formData);
+      const normalized = normalizeUser(updatedProfile) as UserProfile & {
+        firstName: string;
+        lastName: string;
+        name: string;
+      };
+
+      setProfile(normalized);
+      localStorage.setItem('user', JSON.stringify(normalized));
       alert('Profile updated successfully!');
-      // Refresh the page to show updated data
-      window.location.reload();
     } catch (error) {
       console.error('Failed to update profile:', error);
       alert('Failed to update profile. Please try again.');
@@ -111,17 +120,17 @@ export default function ProfilePage() {
               <div className="text-center">
                 <div className="w-24 h-24 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
                   <span className="text-2xl font-bold text-white">
-                    {user.firstName.charAt(0).toUpperCase()}
+                    {(displayUser?.firstName || '').charAt(0).toUpperCase()}
                   </span>
                 </div>
-                <h2 className="text-xl font-bold text-gray-800 mb-2">{user.firstName} {user.lastName}</h2>
-                <p className="text-gray-600 mb-4">{user.email}</p>
+                <h2 className="text-xl font-bold text-gray-800 mb-2">{displayUser?.firstName} {displayUser?.lastName}</h2>
+                <p className="text-gray-600 mb-4">{displayUser?.email}</p>
                 <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
-                  user.role === 'admin' ? 'bg-red-100 text-red-800' :
-                  user.role === 'seller' ? 'bg-green-100 text-green-800' :
+                  displayUser?.role === 'admin' ? 'bg-red-100 text-red-800' :
+                  displayUser?.role === 'seller' ? 'bg-green-100 text-green-800' :
                   'bg-blue-100 text-blue-800'
                 }`}>
-                  {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
+                  {displayUser?.role ? displayUser.role.charAt(0).toUpperCase() + displayUser.role.slice(1) : ''}
                 </span>
               </div>
             </div>
@@ -138,7 +147,7 @@ export default function ProfilePage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Account type</span>
-                  <span className="font-medium capitalize">{user.role}</span>
+                  <span className="font-medium capitalize">{displayUser?.role}</span>
                 </div>
               </div>
             </div>

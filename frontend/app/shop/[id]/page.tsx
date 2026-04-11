@@ -31,7 +31,7 @@ export default function ProductDetailPage() {
   useEffect(() => {
     const fetchProduct = async () => {
       try {
-        const data = await userApi.getProduct(params.id as string) || null;
+        const data:any= await userApi.getProduct(params.id as string) || null;
         setProduct(data);
       } catch (error) {
         console.error('Failed to fetch product:', error);

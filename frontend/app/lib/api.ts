@@ -1,10 +1,46 @@
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, '') ||
+  'http://localhost:5000/api';
 
-interface ApiResponse<T = any> {
-  success: boolean;
+type Primitive = string | number | boolean | null | undefined;
+
+interface ApiEnvelope<T = unknown> {
+  success?: boolean;
   data?: T;
   message?: string;
   error?: string;
+  [key: string]: unknown;
+}
+
+type ApiOptions = RequestInit & {
+  unwrapKey?: string;
+  rawResponse?: boolean;
+};
+
+export interface AuthUser {
+  id?: string;
+  _id?: string;
+  name: string;
+  email: string;
+  role: 'user' | 'seller' | 'admin';
+}
+
+export interface AuthPayload {
+  token: string;
+  user: AuthUser;
+}
+
+export interface ShippingAddress {
+  street: string;
+  city: string;
+  state: string;
+  pincode: string;
+}
+
+export interface OrderItemInput {
+  product: string;
+  quantity: number;
+  price: number;
 }
 
 class ApiError extends Error {
@@ -14,54 +50,133 @@ class ApiError extends Error {
   }
 }
 
-async function apiRequest<T>(
-  endpoint: string,
-  options: RequestInit = {}
-): Promise<T> {
-  const url = `${API_BASE_URL}${endpoint}`;
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
 
-  const config: RequestInit = {
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-    ...options,
-  };
+function extractErrorMessage(payload: unknown, fallback: string) {
+  if (!isPlainObject(payload)) return fallback;
 
-  // Add auth token if available
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers = {
-      ...config.headers,
-      Authorization: `Bearer ${token}`,
-    };
+  const message = payload.message;
+  const error = payload.error;
+
+  if (typeof message === 'string' && message.trim()) return message;
+  if (typeof error === 'string' && error.trim()) return error;
+
+  return fallback;
+}
+
+function unwrapPayload<T>(payload: unknown, unwrapKey?: string): T {
+  if (!isPlainObject(payload)) {
+    return payload as T;
   }
 
+  const envelope = payload as ApiEnvelope<T>;
+
+  if (unwrapKey && unwrapKey in envelope) {
+    return envelope[unwrapKey] as T;
+  }
+
+  if ('data' in envelope) {
+    return envelope.data as T;
+  }
+
+  return payload as T;
+}
+
+function buildHeaders(options: RequestInit) {
+  const headers = new Headers(options.headers);
+
+  if (!headers.has('Content-Type') && options.body && !(options.body instanceof FormData)) {
+    headers.set('Content-Type', 'application/json');
+  }
+
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem('token');
+    if (token) {
+      headers.set('Authorization', `Bearer ${token}`);
+    }
+  }
+
+  return headers;
+}
+
+async function apiRequest<T>(
+  endpoint: string,
+  options: ApiOptions = {}
+): Promise<T> {
+  const { unwrapKey, rawResponse, ...requestOptions } = options;
+  const url = `${API_BASE_URL}${endpoint}`;
+
   try {
-    const response = await fetch(url, config);
-    const data: ApiResponse<T> = await response.json();
+    const response = await fetch(url, {
+      ...requestOptions,
+      headers: buildHeaders(requestOptions),
+    });
+
+    const contentType = response.headers.get('content-type') || '';
+    const isJson = contentType.includes('application/json');
+    const payload = isJson ? await response.json() : null;
 
     if (!response.ok) {
-      throw new ApiError(data.message || 'API request failed', response.status);
+      throw new ApiError(
+        extractErrorMessage(payload, `API request failed with status ${response.status}`),
+        response.status
+      );
     }
 
-    if (!data.success) {
-      throw new ApiError(data.message || 'Request failed');
+    if (isPlainObject(payload) && payload.success === false) {
+      throw new ApiError(extractErrorMessage(payload, 'Request failed'), response.status);
     }
 
-    return data.data as T;
+    if (rawResponse) {
+      return (payload ?? null) as T;
+    }
+
+    return unwrapPayload<T>(payload, unwrapKey);
   } catch (error) {
     if (error instanceof ApiError) {
       throw error;
     }
-    throw new ApiError('Network error');
+
+    throw new ApiError('Unable to reach the backend. Check that the API server is running.');
   }
 }
 
-// Auth API
+export function normalizeUser<T extends Partial<AuthUser>>(user: T | null | undefined) {
+  if (!user) return null;
+
+  const fullName = typeof user.name === 'string' ? user.name.trim() : '';
+  const [firstName = '', ...rest] = fullName.split(/\s+/).filter(Boolean);
+  const lastName = rest.join(' ');
+
+  return {
+    ...user,
+    id: user.id || user._id || '',
+    name: fullName,
+    firstName,
+    lastName,
+  };
+}
+
+function toSearchParams(params?: Record<string, Primitive>) {
+  if (!params) return '';
+
+  const searchParams = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null && value !== '') {
+      searchParams.set(key, String(value));
+    }
+  }
+
+  const query = searchParams.toString();
+  return query ? `?${query}` : '';
+}
+
 export const authApi = {
   login: (email: string, password: string) =>
-    apiRequest<{ token: string; user: any }>('/auth/login', {
+    apiRequest<AuthPayload>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     }),
@@ -72,118 +187,137 @@ export const authApi = {
     password: string;
     role: 'user' | 'seller';
   }) =>
-    apiRequest<{ token: string; user: any }>('/auth/register', {
+    apiRequest<AuthPayload>('/auth/register', {
       method: 'POST',
       body: JSON.stringify(userData),
     }),
-
-  getProfile: () => apiRequest('/auth/profile'),
 };
 
-// User API
 export const userApi = {
   getProfile: () => apiRequest('/user/profile'),
-  updateProfile: (data: any) => apiRequest('/user/profile', {
-    method: 'PUT',
-    body: JSON.stringify(data),
-  }),
+  updateProfile: (data: { firstName: string; lastName: string; email: string }) =>
+    apiRequest('/user/profile', {
+      method: 'PUT',
+      body: JSON.stringify({
+        name: `${data.firstName} ${data.lastName}`.trim(),
+        email: data.email,
+      }),
+      unwrapKey: 'user',
+    }),
   getOrders: () => apiRequest('/user/orders'),
-  getOrder: (id: string) => apiRequest(`/user/orders/${id}`),
-  cancelOrder: (id: string) => apiRequest(`/user/orders/${id}/cancel`, {
-    method: 'POST',
-  }),
+  cancelOrder: (id: string) =>
+    apiRequest(`/user/orders/${id}/cancel`, {
+      method: 'PUT',
+    }),
   getProducts: () => apiRequest('/user/products'),
   getProduct: (id: string) => apiRequest(`/user/products/${id}`),
-  createOrder: (data: any) => apiRequest('/checkout', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  }),
+  createOrder: (data: { items: OrderItemInput[]; shippingAddress: ShippingAddress }) =>
+    apiRequest('/user/orders', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 };
 
-// Seller API
 export const sellerApi = {
-  getDashboard: () => apiRequest('/seller/dashboard'),
-  getProducts: () => apiRequest('/seller/products'),
-  addProduct: (data: any) => apiRequest('/seller/products', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  }),
-  createProduct: (data: any) => apiRequest('/seller/products', {
-    method: 'POST',
-    body: JSON.stringify(data),
-  }),
-  updateProduct: (id: string, data: any) => apiRequest(`/seller/products/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(data),
-  }),
-  deleteProduct: (id: string) => apiRequest(`/seller/products/${id}`, {
-    method: 'DELETE',
-  }),
+  getProducts: () => apiRequest('/seller/products', { unwrapKey: 'products' }),
+  getProduct: (id: string) =>
+    apiRequest(`/seller/products/${id}`, {
+      unwrapKey: 'product',
+    }),
+  addProduct: (data: unknown) =>
+    apiRequest('/seller/products', {
+      method: 'POST',
+      body: JSON.stringify(data),
+      unwrapKey: 'product',
+    }),
+  createProduct: (data: unknown) =>
+    apiRequest('/seller/products', {
+      method: 'POST',
+      body: JSON.stringify(data),
+      unwrapKey: 'product',
+    }),
+  updateProduct: (id: string, data: unknown) =>
+    apiRequest(`/seller/products/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+      unwrapKey: 'product',
+    }),
+  deleteProduct: (id: string) =>
+    apiRequest(`/seller/products/${id}`, {
+      method: 'DELETE',
+      rawResponse: true,
+    }),
 };
 
-// Admin API
 export const adminApi = {
-  getDashboard: () => apiRequest('/admin/dashboard'),
-  getUsers: () => apiRequest('/admin/users'),
-  getSellers: () => apiRequest('/admin/sellers'),
-  updateUserRole: (id: string, role: string) => apiRequest(`/admin/users/${id}/role`, {
-    method: 'PUT',
-    body: JSON.stringify({ role }),
-  }),
-  deleteUser: (id: string) => apiRequest(`/admin/users/${id}`, {
-    method: 'DELETE',
-  }),
-  getProducts: () => apiRequest('/admin/products'),
-  updateProductStatus: (id: string, status: string) => apiRequest(`/admin/products/${id}/status`, {
-    method: 'PUT',
-    body: JSON.stringify({ status }),
-  }),
-  deleteProduct: (id: string) => apiRequest(`/admin/products/${id}`, {
-    method: 'DELETE',
-  }),
-  getOrders: () => apiRequest('/admin/orders'),
-  updateOrderStatus: (id: string, status: string) => apiRequest(`/admin/orders/${id}/status`, {
-    method: 'PUT',
-    body: JSON.stringify({ status }),
-  }),
+  getUsers: () => apiRequest('/admin/users', { unwrapKey: 'users' }),
+  getSellers: () => apiRequest('/admin/sellers', { unwrapKey: 'sellers' }),
+  updateUserRole: (id: string, role: string) =>
+    apiRequest(`/admin/users/${id}/role`, {
+      method: 'PUT',
+      body: JSON.stringify({ role }),
+      unwrapKey: 'user',
+    }),
+  deleteUser: (id: string) =>
+    apiRequest(`/admin/users/${id}`, {
+      method: 'DELETE',
+      rawResponse: true,
+    }),
+  getProducts: () => apiRequest('/admin/products', { unwrapKey: 'products' }),
+  deleteProduct: (id: string) =>
+    apiRequest(`/admin/products/${id}`, {
+      method: 'DELETE',
+      rawResponse: true,
+    }),
+  getOrders: () => apiRequest('/admin/orders', { unwrapKey: 'orders' }),
+  updateOrderStatus: (id: string, status: string) =>
+    apiRequest(`/admin/orders/${id}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status }),
+      unwrapKey: 'order',
+    }),
 };
 
-// Product API
 export const productApi = {
-  getAll: (params?: any) => {
-    const query = params ? `?${new URLSearchParams(params)}` : '';
-    return apiRequest(`/products${query}`);
+  getAll: async (params?: Record<string, Primitive>) => {
+    const products = (await userApi.getProducts()) as Array<Record<string, unknown>>;
+    const category = String(params?.category || '').trim().toLowerCase();
+
+    if (!category) return products;
+
+    return products.filter(
+      (product) => String(product.category || '').trim().toLowerCase() === category
+    );
   },
-  getById: (id: string) => apiRequest(`/products/${id}`),
-  getProduct: (id: string) => apiRequest(`/products/${id}`),
-  getProducts: () => apiRequest(`/products`),
-  search: (query: string) => apiRequest(`/products/search?q=${encodeURIComponent(query)}`),
-  getCategories: () => apiRequest('/products/categories'),
+  getById: (id: string) => userApi.getProduct(id),
+  getProduct: (id: string) => userApi.getProduct(id),
+  getProducts: () => userApi.getProducts(),
+  search: async (query: string) => {
+    const products = (await userApi.getProducts()) as Array<Record<string, unknown>>;
+    const normalizedQuery = query.trim().toLowerCase();
+
+    if (!normalizedQuery) return products;
+
+    return products.filter((product) => {
+      const name = String(product.name || '').toLowerCase();
+      const description = String(product.description || '').toLowerCase();
+      const category = String(product.category || '').toLowerCase();
+
+      return (
+        name.includes(normalizedQuery) ||
+        description.includes(normalizedQuery) ||
+        category.includes(normalizedQuery)
+      );
+    });
+  },
+  getCategories: async () => {
+    const products = (await userApi.getProducts()) as Array<Record<string, unknown>>;
+    return [...new Set(products.map((product) => String(product.category || '')).filter(Boolean))];
+  },
 };
 
-// Cart API (if backend supports it)
-export const cartApi = {
-  getCart: () => apiRequest('/cart'),
-  addToCart: (productId: string, quantity: number) => apiRequest('/cart', {
-    method: 'POST',
-    body: JSON.stringify({ productId, quantity }),
-  }),
-  updateCartItem: (productId: string, quantity: number) => apiRequest(`/cart/${productId}`, {
-    method: 'PUT',
-    body: JSON.stringify({ quantity }),
-  }),
-  removeFromCart: (productId: string) => apiRequest(`/cart/${productId}`, {
-    method: 'DELETE',
-  }),
-  clearCart: () => apiRequest('/cart', { method: 'DELETE' }),
-};
-
-// Checkout API
 export const checkoutApi = {
-  createOrder: (orderData: any) => apiRequest('/checkout', {
-    method: 'POST',
-    body: JSON.stringify(orderData),
-  }),
+  createOrder: userApi.createOrder,
 };
 
-export { ApiError };
+export { ApiError, toSearchParams };

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { userApi } from '../lib/api';
 import { useAuth } from '../lib/auth-context';
 
@@ -26,7 +27,7 @@ interface Order {
     state: string;
     pincode: string;
   };
-  totalAmount: number;
+  totalPrice: number;
   status: string;
   createdAt: string;
 }
@@ -46,7 +47,7 @@ export default function OrdersPage() {
   const fetchOrders = async () => {
     try {
       const data = await userApi.getOrders();
-      setOrders(data as any);
+      setOrders(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Failed to fetch orders:', error);
     } finally {
@@ -119,13 +120,13 @@ export default function OrdersPage() {
           <div className="text-center py-12">
             <div className="text-6xl mb-4">📦</div>
             <h3 className="text-xl font-semibold text-gray-800 mb-2">No orders yet</h3>
-            <p className="text-gray-600 mb-6">When you place orders, they'll appear here.</p>
-            <a
+            <p className="text-gray-600 mb-6">When you place orders, they&apos;ll appear here.</p>
+            <Link
               href="/shop"
               className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
             >
               Start Shopping
-            </a>
+            </Link>
           </div>
         ) : (
           <div className="space-y-6">
@@ -198,7 +199,7 @@ export default function OrdersPage() {
                   </div>
                   <div className="text-right">
                     <p className="text-2xl font-bold text-blue-600">
-                      Total: ${order.totalAmount.toFixed(2)}
+                      Total: ${order.totalPrice.toFixed(2)}
                     </p>
                   </div>
                 </div>
