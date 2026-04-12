@@ -1,4 +1,5 @@
 const Product = require('../models/Product');
+const cloudinary = require('../config/cloudinary');
 
 // Add product
 exports.addProduct = async (req, res) => {
@@ -11,13 +12,48 @@ exports.addProduct = async (req, res) => {
       price,
       category,
       stock,
-      images,
-      seller: req.user.id    // comes from auth middleware
+      images: Array.isArray(images) ? images : [],
+      seller: req.user.id, // comes from auth middleware
     });
 
     res.status(201).json({ success: true, product });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error('[seller] addProduct error:', err.message);
+    res.status(500).json({ success: false, message: err.message || 'Unable to create product' });
+  }
+};
+
+exports.uploadImages = async (req, res) => {
+  try {
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ success: false, message: 'No images uploaded' });
+    }
+
+    const uploadPromises = req.files.map((file) => {
+      return new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          {
+            folder: process.env.CLOUDINARY_FOLDER || 'ecom/products',
+            resource_type: 'image',
+          },
+          (error, result) => {
+            if (error) {
+              reject(error);
+            } else {
+              resolve(result.secure_url);
+            }
+          }
+        );
+
+        stream.end(file.buffer);
+      });
+    });
+
+    const imageUrls = await Promise.all(uploadPromises);
+    res.json({ success: true, images: imageUrls });
+  } catch (err) {
+    console.error('[seller] uploadImages error:', err.message);
+    res.status(500).json({ success: false, message: err.message || 'Image upload failed' });
   }
 };
 

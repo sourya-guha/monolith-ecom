@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { useRouter } from 'next/navigation';
 import { normalizeUser } from './api';
 
 interface User {
@@ -15,7 +16,8 @@ interface User {
 interface AuthContextType {
   user: User | null;
   token: string | null;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<{ otpSent: boolean; message: string }>;
+  verifyOtp: (email: string, otp: string) => Promise<void>;
   register: (userData: {
     name: string;
     email: string;
@@ -46,7 +48,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check for stored token on mount
     const storedToken = localStorage.getItem('token');
     const storedUser = localStorage.getItem('user');
 
@@ -63,29 +64,39 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const login = async (email: string, password: string) => {
     try {
       const { authApi } = await import('./api');
-      const response = await authApi.login(email, password);
+      const response = (await authApi.login(email, password)) as { message?: string };
+      return { otpSent: true, message: response?.message || 'OTP sent' };
+    } catch (error) {
+      throw error;
+    }
+  };
 
+  const verifyOtp = async (email: string, otp: string) => {
+    try {
+      const { authApi } = await import('./api');
+      const response = await authApi.verifyOtp(email, otp);
       const { token: newToken, user: userData } = response;
       const transformedUser = normalizeUser(userData) as User;
-      
+
       setToken(newToken);
       setUser(transformedUser);
 
       localStorage.setItem('token', newToken);
       localStorage.setItem('user', JSON.stringify(transformedUser));
 
-      // Redirect based on role
       const roleRoutes: Record<string, string> = {
         user: '/',
         seller: '/seller/dashboard',
         admin: '/admin/dashboard',
       };
 
-      window.location.href = roleRoutes[userData.role] || '/';
+      router.push(roleRoutes[userData.role] || '/');
     } catch (error) {
       throw error;
     }
   };
+
+  const router = useRouter();
 
   const register = async (userData: {
     name: string;
@@ -106,14 +117,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
       localStorage.setItem('token', newToken);
       localStorage.setItem('user', JSON.stringify(transformedUser));
 
-      // Redirect based on role
       const roleRoutes: Record<string, string> = {
         user: '/',
         seller: '/seller/dashboard',
         admin: '/admin/dashboard',
       };
 
-      window.location.href = roleRoutes[newUser.role] || '/';
+      router.push(roleRoutes[newUser.role] || '/');
     } catch (error) {
       throw error;
     }
@@ -124,13 +134,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setToken(null);
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    window.location.href = '/login';
+    router.push('/login');
   };
 
   const value: AuthContextType = {
     user,
     token,
     login,
+    verifyOtp,
     register,
     logout,
     isLoading,

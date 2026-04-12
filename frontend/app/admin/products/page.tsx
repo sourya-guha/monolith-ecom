@@ -35,8 +35,9 @@ export default function AdminProducts() {
 
   const fetchProducts = async () => {
     try {
-      const data = await adminApi.getProducts() || [];
-      setProducts(data);
+      const data = (await adminApi.getProducts()) as unknown;
+      const productList = Array.isArray(data) ? data : [];
+      setProducts(productList);
     } catch (error) {
       console.error('Failed to fetch products:', error);
     } finally {

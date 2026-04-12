@@ -10,7 +10,7 @@ interface UserProfile {
   id: string;
   name: string;
   email: string;
-  role: string;
+  role: 'user' | 'seller' | 'admin';
 }
 
 export default function ProfilePage() {
@@ -63,7 +63,7 @@ export default function ProfilePage() {
 
     try {
       const updatedProfile = await userApi.updateProfile(formData);
-      const normalized = normalizeUser(updatedProfile) as UserProfile & {
+      const normalized = normalizeUser(updatedProfile as any) as UserProfile & {
         firstName: string;
         lastName: string;
         name: string;

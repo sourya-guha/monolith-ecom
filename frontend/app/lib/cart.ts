@@ -87,29 +87,38 @@ export const cartUtils = {
 // Custom hook for cart management
 export const useCart = () => {
   const [cart, setCart] = useState<Cart>({ items: [], total: 0 });
+  const [itemCount, setItemCount] = useState<number>(0);
 
   useEffect(() => {
-    setCart(cartUtils.getCart());
+    const currentCart = cartUtils.getCart();
+    setCart(currentCart);
+    setItemCount(currentCart.items.reduce((sum, item) => sum + item.quantity, 0));
   }, []);
+
+  const setCartState = (newCart: Cart) => {
+    setCart(newCart);
+    setItemCount(newCart.items.reduce((sum, item) => sum + item.quantity, 0));
+  };
 
   const addItem = (product: Omit<CartItem, 'quantity'>, quantity: number = 1) => {
     const newCart = cartUtils.addItem(product, quantity);
-    setCart(newCart);
+    setCartState(newCart);
   };
 
   const updateQuantity = (id: string, quantity: number) => {
     const newCart = cartUtils.updateQuantity(id, quantity);
-    setCart(newCart);
+    setCartState(newCart);
   };
 
   const removeItem = (id: string) => {
     const newCart = cartUtils.removeItem(id);
-    setCart(newCart);
+    setCartState(newCart);
   };
 
   const clearCart = () => {
     cartUtils.clearCart();
     setCart({ items: [], total: 0 });
+    setItemCount(0);
   };
 
   return {
@@ -118,6 +127,6 @@ export const useCart = () => {
     updateQuantity,
     removeItem,
     clearCart,
-    itemCount: cartUtils.getItemCount(),
+    itemCount,
   };
 };

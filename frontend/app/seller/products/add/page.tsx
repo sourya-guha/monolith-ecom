@@ -56,19 +56,25 @@ export default function AddProduct() {
     setLoading(true);
 
     try {
-      // Convert images to base64 or upload URLs (simplified for demo)
-      const imageUrls = images.map(image => URL.createObjectURL(image));
+      let imageUrls: string[] = [];
+
+      if (images.length > 0) {
+        const formDataPayload = new FormData();
+        images.forEach((image) => formDataPayload.append('images', image));
+        const uploadResponse = await sellerApi.uploadImages(formDataPayload);
+        imageUrls = uploadResponse.images || [];
+      }
 
       const productData = {
         name: formData.name,
         description: formData.description,
         price: parseFloat(formData.price),
         category: formData.category,
-        stock: parseInt(formData.stock),
+        stock: parseInt(formData.stock, 10),
         images: imageUrls,
       };
 
-      const createdProduct = await sellerApi.createProduct(productData) as Product;
+      const createdProduct = (await sellerApi.createProduct(productData)) as Product;
       router.push(`/seller/products/${createdProduct._id}`);
     } catch (error) {
       console.error('Failed to create product:', error);

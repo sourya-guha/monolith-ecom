@@ -176,9 +176,15 @@ function toSearchParams(params?: Record<string, Primitive>) {
 
 export const authApi = {
   login: (email: string, password: string) =>
-    apiRequest<AuthPayload>('/auth/login', {
+    apiRequest('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
+    }),
+
+  verifyOtp: (email: string, otp: string) =>
+    apiRequest<AuthPayload>('/auth/verify-otp', {
+      method: 'POST',
+      body: JSON.stringify({ email, otp }),
     }),
 
   register: (userData: {
@@ -223,6 +229,11 @@ export const sellerApi = {
   getProduct: (id: string) =>
     apiRequest(`/seller/products/${id}`, {
       unwrapKey: 'product',
+    }),
+  uploadImages: (formData: FormData) =>
+    apiRequest<{ images: string[] }>('/seller/upload', {
+      method: 'POST',
+      body: formData,
     }),
   addProduct: (data: unknown) =>
     apiRequest('/seller/products', {

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCart } from '../lib/cart';
 import { userApi } from '../lib/api';
@@ -20,6 +20,7 @@ export default function CheckoutPage() {
   const { user } = useAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [hasMounted, setHasMounted] = useState(false);
   const [shippingAddress, setShippingAddress] = useState<ShippingAddress>({
     street: '',
     city: '',
@@ -27,15 +28,25 @@ export default function CheckoutPage() {
     pincode: '',
   });
 
-  // Redirect if not logged in
-  if (!user) {
-    router.push('/login');
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hasMounted) return;
+
+    if (!user) {
+      router.push('/login');
+    } else if (cart.items.length === 0) {
+      router.push('/cart');
+    }
+  }, [hasMounted, user, cart.items.length, router]);
+
+  if (!hasMounted) {
     return null;
   }
 
-  // Redirect if cart is empty
-  if (cart.items.length === 0) {
-    router.push('/cart');
+  if (!user || cart.items.length === 0) {
     return null;
   }
 

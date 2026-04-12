@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { motion } from 'framer-motion';
 import { Handbag, Search, User, LogOut, Package, Users, BarChart3 } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '../lib/auth-context';
@@ -11,7 +12,12 @@ export default function Navbar() {
   const { itemCount } = useCart();
 
   return (
-    <nav className=" flex justify-between items-center bg-gray-100 rounded-xl shadow-lg p-6 border border-gray-200">
+    <motion.nav
+      initial={{ opacity: 0, y: -16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, ease: 'easeOut' }}
+      className="flex justify-between items-center bg-white/95 backdrop-blur-xl rounded-xl shadow-lg p-6 border border-gray-200 mx-4 mt-6"
+    >
       {/* Logo */}
       <div className="text-xl font-bold text-gray-800">
         <Link href="/">PROJECT-X</Link>
@@ -122,20 +128,19 @@ export default function Navbar() {
           <Search size={20} />
         </Link>
 
-        <Link
-          href="/cart"
-          className="text-gray-600 hover:text-blue-600 font-medium transition-colors relative"
-        >
-          <Handbag size={20} />
-          {itemCount > 0 && (
-            <span className="absolute -top-2 -right-2 bg-blue-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-              {itemCount}
-            </span>
-          )}
+        <Link href="/cart" className="text-gray-600 hover:text-blue-600 font-medium transition-colors relative">
+          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="relative inline-flex">
+            <Handbag size={20} />
+            {itemCount > 0 && (
+              <span className="absolute -top-2 -right-2 bg-blue-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                {itemCount}
+              </span>
+            )}
+          </motion.div>
         </Link>
 
 
       </div>
-    </nav>
+    </motion.nav>
   );
 }

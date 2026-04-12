@@ -43,14 +43,15 @@ export default function SellerDashboard() {
 
   const fetchDashboardData = async () => {
     try {
-      const products = await sellerApi.getProducts() || [];
+      const productsData = (await sellerApi.getProducts()) as unknown;
+      const products = Array.isArray(productsData) ? productsData : [];
 
       // Mock stats - in a real app, you'd have a dedicated stats endpoint
       setStats({
-        totalProducts: (products || []).length,
+        totalProducts: products.length,
         totalOrders: 0, // Would come from API
         totalRevenue: 0, // Would come from API
-        recentProducts: (products || []).slice(0, 5),
+        recentProducts: products.slice(0, 5),
       });
     } catch (error) {
       console.error('Failed to fetch dashboard data:', error);

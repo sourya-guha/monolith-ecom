@@ -40,22 +40,26 @@ export default function AdminDashboard() {
   const fetchDashboardData = async () => {
     try {
       // Fetch all data in parallel
-      const users = await adminApi.getUsers() || [];
-      const sellers = await adminApi.getSellers() || [];
-      const products = await adminApi.getProducts() || [];
-      const orders = await adminApi.getOrders() || [];
+      const users = (await adminApi.getUsers()) as unknown;
+      const sellers = (await adminApi.getSellers()) as unknown;
+      const products = (await adminApi.getProducts()) as unknown;
+      const orders = (await adminApi.getOrders()) as AdminOrderSummary[] | unknown;
+      const userList = Array.isArray(users) ? users : [];
+      const sellerList = Array.isArray(sellers) ? sellers : [];
+      const productList = Array.isArray(products) ? products : [];
+      const orderList = Array.isArray(orders) ? (orders as AdminOrderSummary[]) : [];
 
       // Calculate stats
-      const totalRevenue = (orders || []).reduce(
+      const totalRevenue = orderList.reduce(
         (sum: number, order: AdminOrderSummary) => sum + (order?.totalPrice || 0),
         0
       );
 
       setStats({
-        totalUsers: (users || []).length,
-        totalSellers: (sellers || []).length,
-        totalProducts: (products || []).length,
-        totalOrders: (orders || []).length,
+        totalUsers: userList.length,
+        totalSellers: sellerList.length,
+        totalProducts: productList.length,
+        totalOrders: orderList.length,
         totalRevenue,
       });
     } catch (error) {
