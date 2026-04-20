@@ -54,7 +54,7 @@ export const cartUtils = {
 
       const items: CartItem[] = itemsRaw
         .map(cartUtils.normalizeCartItem)
-        .filter((x): x is CartItem => x !== null);
+        .filter((x: CartItem | null): x is CartItem => x !== null);
 
       const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
       return { items, total };

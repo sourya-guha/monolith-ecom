@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
-import { normalizeUser } from './api';
+import { normalizeUser, type AuthPayload } from './api';
 
 interface User {
   id: string;
