@@ -17,8 +17,8 @@ router.get('/products', getAllProducts);
 router.get('/products/:id', getProduct);
 
 // Protected routes — login needed
-router.get('/profile', auth, role('user'), getProfile);
-router.put('/profile', auth, role('user'), updateProfile);
+router.get('/profile', auth, role('user', 'seller', 'admin'), getProfile);
+router.put('/profile', auth, role('user', 'seller', 'admin'), updateProfile);
 router.post('/orders', auth, role('user'), placeOrder);
 router.get('/orders', auth, role('user'), getMyOrders);
 router.put('/orders/:id/cancel', auth, role('user'), cancelOrder);

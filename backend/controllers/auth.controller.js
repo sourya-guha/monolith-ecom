@@ -27,31 +27,37 @@ exports.register = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Name, email, and password are required' });
     }
 
-    const existingUser = await User.findOne({ email: email.toLowerCase().trim() });
+    const normalizedEmail = email.toLowerCase().trim();
+
+    const existingUser = await User.findOne({ email: normalizedEmail });
     if (existingUser) {
       return res.status(400).json({ success: false, message: 'Email already exists' });
     }
 
-    const user = await User.create({
+    // Create the user
+    await User.create({
       name: name.trim(),
-      email: email.toLowerCase().trim(),
+      email: normalizedEmail,
       password,
       role,
     });
 
-    const token = generateToken(user);
+    // Generate and send OTP for email verification
+    if (!(await canRequestOtp(normalizedEmail))) {
+      return res.status(429).json({
+        success: false,
+        message: 'Too many OTP requests. Please try again later.',
+      });
+    }
+
+    await recordOtpRequest(normalizedEmail);
+    const otp = generateOtp();
+    await storeOtp(normalizedEmail, otp);
+    await sendOtpEmail(normalizedEmail, otp);
 
     res.status(201).json({
       success: true,
-      data: {
-        token,
-        user: {
-          id: user._id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-        },
-      },
+      message: 'Account created! OTP sent to your email. Please verify to complete registration.',
     });
   } catch (err) {
     console.error('[auth] register error:', err.message);
@@ -78,19 +84,21 @@ exports.login = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid email or password' });
     }
 
-    if (!(await canRequestOtp(normalizedEmail))) {
-      return res.status(429).json({
-        success: false,
-        message: 'Too many OTP requests. Please try again later.',
-      });
-    }
+    // Login succeeds — return token directly, no OTP
+    const token = generateToken(user);
 
-    await recordOtpRequest(normalizedEmail);
-    const otp = generateOtp();
-    await storeOtp(normalizedEmail, otp);
-    await sendOtpEmail(normalizedEmail, otp);
-
-    res.json({ success: true, message: 'OTP sent to your email address. Please enter the code to complete login.' });
+    res.json({
+      success: true,
+      data: {
+        token,
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+        },
+      },
+    });
   } catch (err) {
     console.error('[auth] login error:', err.message);
     res.status(500).json({ success: false, message: err.message || 'Login failed' });

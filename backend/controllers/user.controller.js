@@ -15,10 +15,15 @@ exports.getProfile = async (req, res) => {
 // Update profile
 exports.updateProfile = async (req, res) => {
   try {
-    const { name, email } = req.body;
+    const { name, email, firstName, lastName } = req.body;
+    const computedName =
+      typeof name === 'string' && name.trim()
+        ? name.trim()
+        : `${String(firstName || '').trim()} ${String(lastName || '').trim()}`.trim();
+
     const user = await User.findByIdAndUpdate(
       req.user.id,
-      { name, email },
+      { ...(computedName ? { name: computedName } : {}), ...(email ? { email } : {}) },
       { new: true }
     ).select('-password');
     res.json({ success: true, user });
@@ -52,16 +57,46 @@ exports.getProduct = async (req, res) => {
 
 // Place order
 exports.placeOrder = async (req, res) => {
+  let decremented = [];
   try {
     const { items, shippingAddress } = req.body;
 
-    // Calculate total price
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ message: 'Order items are required' });
+    }
+
+    // Atomically decrement inventory while computing total. If anything fails, rollback prior decrements.
     let totalPrice = 0;
-    for (let item of items) {
-      const product = await Product.findById(item.product);
-      if (!product) {
-        return res.status(404).json({ message: 'Product not found' });
+    decremented = [];
+
+    for (const item of items) {
+      if (!item?.product || !Number.isFinite(item.quantity) || item.quantity <= 0) {
+        // rollback any decremented stock before returning
+        for (const d of decremented) {
+          await Product.findByIdAndUpdate(d.productId, { $inc: { stock: d.quantity } });
+        }
+        return res.status(400).json({ message: 'Invalid order item' });
       }
+
+      const product = await Product.findOneAndUpdate(
+        { _id: item.product, stock: { $gte: item.quantity } },
+        { $inc: { stock: -item.quantity } },
+        { new: false }
+      );
+
+      if (!product) {
+        for (const d of decremented) {
+          await Product.findByIdAndUpdate(d.productId, { $inc: { stock: d.quantity } });
+        }
+
+        const exists = await Product.exists({ _id: item.product });
+        if (!exists) {
+          return res.status(404).json({ message: 'Product not found' });
+        }
+        return res.status(400).json({ message: 'Insufficient stock for one or more items' });
+      }
+
+      decremented.push({ productId: product._id, quantity: item.quantity });
       totalPrice += product.price * item.quantity;
     }
 
@@ -74,6 +109,15 @@ exports.placeOrder = async (req, res) => {
 
     res.status(201).json({ success: true, data: order });
   } catch (err) {
+    if (decremented.length > 0) {
+      try {
+        await Promise.all(
+          decremented.map((d) => Product.findByIdAndUpdate(d.productId, { $inc: { stock: d.quantity } }))
+        );
+      } catch (_) {
+        // If rollback fails, prefer surfacing original error.
+      }
+    }
     res.status(500).json({ message: err.message });
   }
 };
