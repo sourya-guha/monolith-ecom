@@ -367,4 +367,4 @@ export const chatApi = {
     apiRequest(`/chat/conversations/${conversationId}/messages`, { unwrapKey: 'messages' }),
 };
 
-export { ApiError, toSearchParams };
+export { toSearchParams };
