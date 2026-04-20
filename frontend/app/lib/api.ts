@@ -43,12 +43,12 @@ export interface OrderItemInput {
   price: number;
 }
 
-export class ApiError extends Error {
+export class AppApiError extends Error {
   status?: number;
 
   constructor(message: string, status?: number) {
     super(message);
-    this.name = 'ApiError';
+    this.name = 'AppApiError';
     this.status = status;
   }
 }
@@ -140,7 +140,7 @@ async function apiRequest<T>(
     const payload = await parseResponsePayload(response);
 
     if (!response.ok) {
-      throw new ApiError(
+      throw new AppApiError(
         extractErrorMessage(
           payload,
           `API request to ${endpoint} failed (${response.status} ${response.statusText || 'error'})`
@@ -150,7 +150,7 @@ async function apiRequest<T>(
     }
 
     if (isPlainObject(payload) && payload.success === false) {
-      throw new ApiError(extractErrorMessage(payload, `Request to ${endpoint} failed`), response.status);
+      throw new AppApiError(extractErrorMessage(payload, `Request to ${endpoint} failed`), response.status);
     }
 
     if (rawResponse) {
@@ -159,11 +159,11 @@ async function apiRequest<T>(
 
     return unwrapPayload<T>(payload, unwrapKey);
   } catch (error) {
-    if (error instanceof ApiError) {
+    if (error instanceof AppApiError) {
       throw error;
     }
 
-    throw new ApiError(`Unable to reach the backend for ${endpoint}. Check that the API server is running.`);
+    throw new AppApiError(`Unable to reach the backend for ${endpoint}. Check that the API server is running.`);
   }
 }
 

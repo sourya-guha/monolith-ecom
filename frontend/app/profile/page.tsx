@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../lib/auth-context';
-import { ApiError, normalizeUser, userApi } from '../lib/api';
+import { AppApiError, normalizeUser, userApi } from '../lib/api';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,7 +45,7 @@ export default function ProfilePage() {
       const data = await userApi.getProfile();
       setProfile(data as UserProfile);
     } catch (error) {
-      if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+      if (error instanceof AppApiError && (error.status === 401 || error.status === 403)) {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         router.replace('/login');

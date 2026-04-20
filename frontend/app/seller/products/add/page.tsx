@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth-context';
-import { ApiError, sellerApi } from '../../../lib/api';
+import { AppApiError, sellerApi } from '../../../lib/api';
 import { ArrowLeft, Upload } from 'lucide-react';
 import Link from 'next/link';
 
@@ -79,7 +79,7 @@ export default function AddProduct() {
     } catch (error) {
       console.error('Failed to create product:', error);
       const message =
-        error instanceof ApiError
+        error instanceof AppApiError
           ? `${error.message}${error.status ? ` (status ${error.status})` : ''}`
           : error instanceof Error
             ? error.message
