@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { userApi, productApi } from '../lib/api';
 import { useCart } from '../lib/cart';
 import { useAuth } from '../lib/auth-context';
+import { Search, ShoppingCart, SlidersHorizontal } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,12 +29,11 @@ export default function ShopPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [categories, setCategories] = useState<string[]>([]);
-  
+
   const { addItem } = useCart();
   const { user } = useAuth();
   const router = useRouter();
 
-  // Redirect Sellers away from Shop
   useEffect(() => {
     if (user?.role === 'seller') {
       router.replace('/seller/dashboard');
@@ -49,7 +49,7 @@ export default function ShopPage() {
           userApi.getProducts() as Promise<Product[]>,
           productApi.getCategories() as Promise<string[]>
         ]);
-        
+
         const safeProducts = Array.isArray(productList)
           ? productList.map((p) => ({
               ...p,
@@ -68,123 +68,125 @@ export default function ShopPage() {
         setLoading(false);
       }
     };
-
     fetchData();
   }, []);
 
-  // Filter products when search or category changes
   useEffect(() => {
     let result = products;
-
     if (searchTerm) {
       const query = searchTerm.toLowerCase();
-      result = result.filter(p => 
-        p.name.toLowerCase().includes(query) || 
+      result = result.filter(p =>
+        p.name.toLowerCase().includes(query) ||
         p.description.toLowerCase().includes(query)
       );
     }
-
     if (selectedCategory) {
       result = result.filter(p => p.category === selectedCategory);
     }
-
     setFilteredProducts(result);
   }, [searchTerm, selectedCategory, products]);
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="spinner" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12">
-      <div className="max-w-7xl mx-auto px-6">
-        <div className="flex flex-col md:flex-row md:items-center justify-between mb-12 gap-6">
+    <div className="min-h-screen py-8 sm:py-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Header */}
+        <div className="flex flex-col lg:flex-row lg:items-end justify-between mb-8 sm:mb-10 gap-6">
           <div>
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">Explore Our Collection</h1>
-            <p className="text-gray-600 font-medium">Find the best products curated just for you</p>
+            <h1 className="text-3xl sm:text-4xl font-bold mb-2">
+              Explore <span className="gradient-text">Collection</span>
+            </h1>
+            <p className="text-sm text-[#64748b]">
+              {filteredProducts.length} product{filteredProducts.length !== 1 ? 's' : ''} available
+            </p>
           </div>
-          
-          <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
-            <div className="relative flex-grow">
+
+          <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
+            {/* Search */}
+            <div className="relative flex-1 lg:w-72">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#64748b]" size={16} />
               <input
                 type="text"
                 placeholder="Search products..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-12 pr-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all shadow-sm"
+                className="input-dark pl-10 py-2.5 text-sm"
               />
-              <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
             </div>
-            
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none transition-all shadow-sm bg-white font-medium"
-            >
-              <option value="">All Categories</option>
-              {categories.map(cat => (
-                <option key={cat} value={cat}>{cat}</option>
-              ))}
-            </select>
+
+            {/* Category Filter */}
+            <div className="relative">
+              <SlidersHorizontal className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#64748b] pointer-events-none" size={14} />
+              <select
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className="input-dark pl-9 pr-8 py-2.5 text-sm appearance-none cursor-pointer"
+              >
+                <option value="">All Categories</option>
+                {categories.map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
 
+        {/* Content */}
         {loadError ? (
-          <div className="bg-red-50 border border-red-200 text-red-700 rounded-2xl p-5 mb-8">
-            <div className="font-semibold">Unable to load products</div>
-            <div className="text-sm mt-1">{loadError}</div>
+          <div className="glass-card p-6 text-center border-[#f43f5e]/20">
+            <div className="text-[#fb7185] font-semibold">Unable to load products</div>
+            <div className="text-sm text-[#64748b] mt-1">{loadError}</div>
           </div>
         ) : filteredProducts.length === 0 ? (
-          <div className="text-center py-20 bg-white rounded-3xl shadow-sm border border-gray-100">
-            <div className="text-6xl mb-4">🔍</div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-2">No products found</h3>
-            <p className="text-gray-500 max-w-md mx-auto">We couldn't find any products matching your current filters. Try adjusting your search or category.</p>
-            <button 
-              onClick={() => {setSearchTerm(''); setSelectedCategory('');}}
-              className="mt-6 text-blue-600 font-semibold hover:underline"
+          <div className="glass-card p-12 sm:p-16 text-center">
+            <div className="text-5xl mb-4">🔍</div>
+            <h3 className="text-xl font-bold text-white mb-2">No products found</h3>
+            <p className="text-[#64748b] max-w-md mx-auto text-sm">Try adjusting your search or category filter.</p>
+            <button
+              onClick={() => { setSearchTerm(''); setSelectedCategory(''); }}
+              className="mt-6 text-[#c084fc] font-semibold hover:underline text-sm"
             >
               Clear all filters
             </button>
           </div>
         ) : (
-          <motion.div 
-            layout
-            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8"
-          >
+          <motion.div layout className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
             <AnimatePresence mode='popLayout'>
               {filteredProducts.map((product) => (
                 <motion.div
                   key={product._id}
                   layout
-                  initial={{ opacity: 0, scale: 0.9 }}
+                  initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.9 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
                   transition={{ duration: 0.3 }}
-                  className="bg-white rounded-3xl overflow-hidden shadow-sm hover:shadow-xl transition-all border border-gray-100 group flex flex-col"
+                  className="glass-card glass-card-hover overflow-hidden group flex flex-col"
                 >
-                  <Link href={user ? `/shop/${product._id}` : '/login'} className="relative h-64 overflow-hidden block">
+                  <Link href={user ? `/shop/${product._id}` : '/login'} className="relative h-56 img-zoom block">
                     <img
                       src={product.images?.[0] || 'https://via.placeholder.com/400'}
                       alt={product.name}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                      className="w-full h-full object-cover"
                     />
-                    <div className="absolute top-4 right-4 bg-white/90 backdrop-blur px-3 py-1 rounded-full text-sm font-bold text-blue-600 shadow-sm">
+                    <div className="absolute top-3 right-3 px-3 py-1 rounded-full bg-black/50 backdrop-blur-md text-sm font-bold text-white border border-white/10">
                       ${product.price}
                     </div>
                   </Link>
-                  <div className="p-6 flex flex-col flex-grow">
-                    <div className="text-xs font-bold text-blue-500 uppercase tracking-wider mb-2">{product.category}</div>
+
+                  <div className="p-5 flex flex-col flex-grow">
+                    <div className="text-[10px] font-bold text-[#c084fc] uppercase tracking-widest mb-1.5">{product.category}</div>
                     <Link href={user ? `/shop/${product._id}` : '/login'}>
-                      <h3 className="text-xl font-bold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors line-clamp-1">{product.name}</h3>
+                      <h3 className="text-base font-semibold text-white mb-1 group-hover:text-[#c084fc] transition-colors line-clamp-1">{product.name}</h3>
                     </Link>
-                    <p className="text-gray-500 text-sm mb-6 line-clamp-2 flex-grow">{product.description}</p>
-                    
+                    <p className="text-[#64748b] text-xs mb-4 line-clamp-2 flex-grow">{product.description}</p>
+
                     {!!user && user.role !== 'seller' && (
                       <button
                         onClick={(e) => {
@@ -193,21 +195,19 @@ export default function ShopPage() {
                           addItem(product as any);
                         }}
                         disabled={product.stock <= 0}
-                        className={`w-full py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${
-                          product.stock > 0 
-                            ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-200 active:scale-[0.98]' 
-                            : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        className={`w-full py-2.5 rounded-xl text-sm font-semibold transition-all flex items-center justify-center gap-2 ${
+                          product.stock > 0
+                            ? 'btn-gradient shadow-lg'
+                            : 'bg-white/[0.05] text-[#64748b] cursor-not-allowed border border-white/[0.06]'
                         }`}
                       >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                        </svg>
+                        <ShoppingCart size={15} />
                         {product.stock > 0 ? 'Add to Cart' : 'Out of Stock'}
                       </button>
                     )}
                     {user?.role === 'seller' && (
-                      <div className="w-full py-3 rounded-xl bg-gray-50 text-gray-500 text-sm font-medium text-center border border-dashed border-gray-200">
-                        View only mode
+                      <div className="w-full py-2.5 rounded-xl bg-white/[0.03] text-[#64748b] text-xs font-medium text-center border border-dashed border-white/[0.08]">
+                        View only
                       </div>
                     )}
                   </div>

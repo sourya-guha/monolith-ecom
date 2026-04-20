@@ -1,32 +1,26 @@
 'use client';
 
 import React, { useState } from 'react';
+import { motion } from 'framer-motion';
 import GoogleButton from '../components/GoogleButton';
 import Link from 'next/link';
 import { useAuth } from '../lib/auth-context';
+import { LogIn } from 'lucide-react';
 
 const LoginPage = () => {
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-  });
+  const [formData, setFormData] = useState({ email: '', password: '' });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-
   const { login } = useAuth();
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData((prev) => ({
-      ...prev,
-      [e.target.name]: e.target.value,
-    }));
+    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
-
     try {
       await login(formData.email, formData.password);
     } catch (err: any) {
@@ -37,92 +31,88 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="flex justify-center items-center min-h-screen bg-gray-100">
-      <div className="w-[600px] h-[600px] p-6">
-        <h2 className="text-4xl font-semibold text-center mb-8 text-gray-800">Login To Your Account</h2>
-        <div className="flex items-center justify-center gap-2 mb-8">
-          <span className="text-lg">Don't have an account?</span>
-          <Link
-            href="/signin"
-            className="text-blue-600 font-medium hover:underline hover:text-blue-700 transition-colors"
-          >
-            Sign in
-          </Link>
-        </div>
+    <div className="min-h-screen flex items-center justify-center relative overflow-hidden px-4 py-12">
+      {/* Background blobs */}
+      <div className="blob blob-1 -top-60 -left-40 opacity-20" />
+      <div className="blob blob-2 bottom-[-100px] right-[-80px] opacity-20" />
 
-        <form className="space-y-4" onSubmit={handleSubmit}>
-          <div className="w-full flex justify-center">
-            <GoogleButton />
-          </div>
-
-          <div className="relative flex items-center w-full py-6">
-            <div className="flex-grow border-t border-gray-300"></div>
-            <span className="flex-shrink mx-6 text-gray-500 text-lg font-medium uppercase tracking-wider">
-              or sign in with email
-            </span>
-            <div className="flex-grow border-t border-gray-300"></div>
-          </div>
-
-          <div className="relative w-full">
-            <input
-              type="email"
-              id="email"
-              name="email"
-              value={formData.email}
-              onChange={handleInputChange}
-              placeholder=" "
-              className="border-slate-400 border-1 peer w-full h-16 px-8 pt-4 text-lg border border-gray-300 rounded-2xl focus:border-blue-500 outline-none transition-all placeholder-transparent"
-            />
-            <label
-              htmlFor="email"
-              className="absolute left-8 top-1/2 -translate-y-1/2 text-gray-400 text-lg transition-all cursor-text
-               peer-placeholder-shown:top-1/2 peer-placeholder-shown:text-lg
-               peer-focus:top-3 peer-focus:text-xs peer-focus:text-blue-500
-               peer-[:not(:placeholder-shown)]:top-3 peer-[:not(:placeholder-shown)]:text-xs"
-            >
-              name@example.com
-            </label>
-          </div>
-
-          <div className="relative">
-            <input
-              type="password"
-              id="password"
-              name="password"
-              value={formData.password}
-              onChange={handleInputChange}
-              placeholder=" "
-              className="border-slate-400 peer w-full h-16 px-6 pt-5 text-lg border-1 rounded-2xl focus:border-blue-500 outline-none transition-all"
-            />
-            <label
-              htmlFor="password"
-              className="absolute left-8 top-1/2 -translate-y-1/2 text-gray-400 text-lg transition-all cursor-text
-               peer-placeholder-shown:top-1/2 peer-placeholder-shown:text-lg
-               peer-focus:top-3 peer-focus:text-xs peer-focus:text-blue-500
-               peer-[:not(:placeholder-shown)]:top-3 peer-[:not(:placeholder-shown)]:text-xs"
-            >
-              Password
-            </label>
-          </div>
-
-          {error && (
-            <div className="text-red-500 text-sm text-center bg-red-50 p-2 rounded-lg">
-              {error}
+      <motion.div
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6 }}
+        className="relative z-10 w-full max-w-md"
+      >
+        <div className="glass-card p-8 sm:p-10">
+          <div className="text-center mb-8">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#7c3aed] to-[#4f46e5] flex items-center justify-center mx-auto mb-4 shadow-lg shadow-purple-500/20">
+              <LogIn size={22} className="text-white" />
             </div>
-          )}
+            <h2 className="text-2xl sm:text-3xl font-bold text-white">Welcome Back</h2>
+            <p className="text-sm text-[#64748b] mt-2">Sign in to your account to continue</p>
+          </div>
 
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="group relative w-full h-10 mt-6 bg-[#0071e3] hover:bg-[#0077ed] active:bg-[#006edb] disabled:bg-gray-400 disabled:cursor-not-allowed text-white text-xl font-small tracking-tight rounded-xl transition-all duration-300 ease-out shadow-[0_4px_14px_0_rgba(0,118,255,0.39)] hover:shadow-[0_6px_20px_rgba(0,118,255,0.23)] active:scale-[0.98] overflow-hidden pb-1"
-          >
-            <span className="relative z-10">
-              {isLoading ? 'Signing In...' : 'Login'}
-            </span>
-            <div className="absolute inset-0 h-full w-full scale-0 rounded-full transition-all duration-300 group-hover:scale-100 group-hover:bg-white/10"></div>
-          </button>
-        </form>
-      </div>
+          <div className="flex justify-center gap-2 mb-6 text-sm">
+            <span className="text-[#64748b]">Don&apos;t have an account?</span>
+            <Link href="/signin" className="text-[#c084fc] font-medium hover:underline">Sign up</Link>
+          </div>
+
+          <form className="space-y-4" onSubmit={handleSubmit}>
+            <div className="w-full flex justify-center">
+              <GoogleButton />
+            </div>
+
+            <div className="relative flex items-center w-full py-4">
+              <div className="flex-grow border-t border-white/[0.06]" />
+              <span className="flex-shrink mx-4 text-[#64748b] text-xs font-medium uppercase tracking-wider">
+                or sign in with email
+              </span>
+              <div className="flex-grow border-t border-white/[0.06]" />
+            </div>
+
+            <div>
+              <label htmlFor="email" className="block text-xs font-medium text-[#94a3b8] mb-1.5">Email</label>
+              <input
+                type="email"
+                id="email"
+                name="email"
+                value={formData.email}
+                onChange={handleInputChange}
+                className="input-dark"
+                placeholder="name@example.com"
+                required
+              />
+            </div>
+
+            <div>
+              <label htmlFor="password" className="block text-xs font-medium text-[#94a3b8] mb-1.5">Password</label>
+              <input
+                type="password"
+                id="password"
+                name="password"
+                value={formData.password}
+                onChange={handleInputChange}
+                className="input-dark"
+                placeholder="••••••••"
+                required
+              />
+            </div>
+
+            {error && (
+              <div className="text-sm text-center p-3 rounded-xl bg-[#f43f5e]/10 text-[#fb7185] border border-[#f43f5e]/20">
+                {error}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="btn-gradient w-full py-3 text-base mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isLoading ? 'Signing In...' : 'Sign In'}
+            </button>
+          </form>
+        </div>
+      </motion.div>
     </div>
   );
 };

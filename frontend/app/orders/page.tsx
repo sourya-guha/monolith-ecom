@@ -2,18 +2,15 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { motion } from 'framer-motion';
 import { userApi } from '../lib/api';
 import { useAuth } from '../lib/auth-context';
+import { Package, ArrowRight } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
 interface OrderItem {
-  product: {
-    _id: string;
-    name: string;
-    price: number;
-    images: string[];
-  };
+  product: { _id: string; name: string; price: number; images: string[]; };
   quantity: number;
   price: number;
 }
@@ -21,12 +18,7 @@ interface OrderItem {
 interface Order {
   _id: string;
   items: OrderItem[];
-  shippingAddress: {
-    street: string;
-    city: string;
-    state: string;
-    pincode: string;
-  };
+  shippingAddress: { street: string; city: string; state: string; pincode: string; };
   totalPrice: number;
   status: string;
   createdAt: string;
@@ -39,9 +31,7 @@ export default function OrdersPage() {
   const [cancellingOrder, setCancellingOrder] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user) {
-      fetchOrders();
-    }
+    if (user) fetchOrders();
   }, [user]);
 
   const fetchOrders = async () => {
@@ -57,11 +47,9 @@ export default function OrdersPage() {
 
   const handleCancelOrder = async (orderId: string) => {
     if (!confirm('Are you sure you want to cancel this order?')) return;
-
     setCancellingOrder(orderId);
     try {
       await userApi.cancelOrder(orderId);
-      // Refresh orders
       await fetchOrders();
     } catch (error) {
       console.error('Failed to cancel order:', error);
@@ -71,30 +59,24 @@ export default function OrdersPage() {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'processing':
-        return 'bg-blue-100 text-blue-800';
-      case 'shipped':
-        return 'bg-purple-100 text-purple-800';
-      case 'delivered':
-        return 'bg-green-100 text-green-800';
-      case 'cancelled':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
+  const getStatusBadge = (status: string) => {
+    const map: Record<string, string> = {
+      pending: 'badge-pending',
+      processing: 'badge-processing',
+      shipped: 'badge-shipped',
+      delivered: 'badge-delivered',
+      cancelled: 'badge-cancelled',
+    };
+    return map[status.toLowerCase()] || 'bg-white/[0.05] text-[#94a3b8]';
   };
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="text-6xl mb-4">🔒</div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">Please log in</h2>
-          <p className="text-gray-600">You need to be logged in to view your orders.</p>
+          <h2 className="text-2xl font-bold text-white mb-2">Please log in</h2>
+          <p className="text-[#64748b] text-sm">You need to be logged in to view your orders.</p>
         </div>
       </div>
     );
@@ -102,108 +84,100 @@ export default function OrdersPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="spinner" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-7xl mx-auto px-6">
-        <div className="flex items-center justify-between mb-8">
-          <h1 className="text-3xl font-bold text-gray-800">My Orders</h1>
-          <span className="text-gray-600">{orders.length} orders</span>
-        </div>
+    <div className="min-h-screen py-8 sm:py-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-center justify-between mb-8"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#7c3aed]/20 to-[#4f46e5]/20 border border-[#7c3aed]/20 flex items-center justify-center text-[#c084fc]">
+              <Package size={20} />
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-white">My Orders</h1>
+          </div>
+          <span className="text-xs text-[#64748b] font-medium">{orders.length} order{orders.length !== 1 ? 's' : ''}</span>
+        </motion.div>
 
         {orders.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="text-6xl mb-4">📦</div>
-            <h3 className="text-xl font-semibold text-gray-800 mb-2">No orders yet</h3>
-            <p className="text-gray-600 mb-6">When you place orders, they&apos;ll appear here.</p>
-            <Link
-              href="/shop"
-              className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
-            >
-              Start Shopping
+          <div className="glass-card p-12 sm:p-16 text-center">
+            <div className="text-5xl mb-4">📦</div>
+            <h3 className="text-xl font-bold text-white mb-2">No orders yet</h3>
+            <p className="text-[#64748b] mb-6 text-sm">When you place orders, they&apos;ll appear here.</p>
+            <Link href="/shop" className="btn-gradient py-3 px-8">
+              Start Shopping <ArrowRight size={16} />
             </Link>
           </div>
         ) : (
-          <div className="space-y-6">
-            {orders.map((order) => (
-              <div key={order._id} className="bg-white rounded-xl shadow-md p-6">
+          <div className="space-y-4">
+            {orders.map((order, i) => (
+              <motion.div
+                key={order._id}
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.05 }}
+                className="glass-card p-5 sm:p-6"
+              >
                 {/* Order Header */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 pb-4 border-b">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 pb-4 border-b border-white/[0.06]">
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-800">
-                      Order #{order._id.slice(-8)}
-                    </h3>
-                    <p className="text-gray-600 text-sm">
-                      Placed on {new Date(order.createdAt).toLocaleDateString()}
-                    </p>
+                    <h3 className="text-sm font-semibold text-white">Order #{order._id.slice(-8)}</h3>
+                    <p className="text-xs text-[#64748b] mt-0.5">{new Date(order.createdAt).toLocaleDateString()}</p>
                   </div>
-                  <div className="flex items-center gap-4 mt-4 md:mt-0">
-                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(order.status)}`}>
+                  <div className="flex items-center gap-3 mt-3 sm:mt-0">
+                    <span className={`px-3 py-1 rounded-full text-xs font-semibold capitalize ${getStatusBadge(order.status)}`}>
                       {order.status}
                     </span>
                     {order.status === 'pending' && (
                       <button
                         onClick={() => handleCancelOrder(order._id)}
                         disabled={cancellingOrder === order._id}
-                        className="text-red-600 hover:text-red-700 font-medium text-sm disabled:opacity-50"
+                        className="text-xs text-[#f43f5e] hover:underline font-medium disabled:opacity-50"
                       >
-                        {cancellingOrder === order._id ? 'Cancelling...' : 'Cancel Order'}
+                        {cancellingOrder === order._id ? 'Cancelling...' : 'Cancel'}
                       </button>
                     )}
                   </div>
                 </div>
 
-                {/* Order Items */}
-                <div className="space-y-4 mb-6">
+                {/* Items */}
+                <div className="space-y-3 mb-4">
                   {order.items.map((item, index) => (
-                    <div key={index} className="flex items-center gap-4">
-                      <div className="w-16 h-16 bg-gray-200 rounded-lg flex items-center justify-center flex-shrink-0">
-                        {item.product.images && item.product.images.length > 0 ? (
-                          <img
-                            src={item.product.images[0]}
-                            alt={item.product.name}
-                            className="w-full h-full object-cover rounded-lg"
-                          />
+                    <div key={index} className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 bg-white/[0.03]">
+                        {item.product.images?.length > 0 ? (
+                          <img src={item.product.images[0]} alt={item.product.name} className="w-full h-full object-cover" />
                         ) : (
-                          <div className="text-gray-400 text-lg">📦</div>
+                          <div className="w-full h-full flex items-center justify-center text-[#64748b] text-sm">📦</div>
                         )}
                       </div>
-                      <div className="flex-1">
-                        <h4 className="font-medium text-gray-800">{item.product.name}</h4>
-                        <p className="text-gray-600 text-sm">
-                          Quantity: {item.quantity} × ${item.price}
-                        </p>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-sm font-medium text-white truncate">{item.product.name}</h4>
+                        <p className="text-xs text-[#64748b]">{item.quantity} × ${item.price}</p>
                       </div>
-                      <div className="text-right">
-                        <p className="font-semibold text-gray-800">
-                          ${(item.quantity * item.price).toFixed(2)}
-                        </p>
-                      </div>
+                      <p className="text-sm font-semibold text-white">${(item.quantity * item.price).toFixed(2)}</p>
                     </div>
                   ))}
                 </div>
 
-                {/* Order Footer */}
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center pt-4 border-t">
-                  <div className="mb-4 md:mb-0">
-                    <h4 className="font-medium text-gray-800 mb-2">Shipping Address</h4>
-                    <p className="text-gray-600 text-sm">
-                      {order.shippingAddress.street}<br />
-                      {order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.pincode}
+                {/* Footer */}
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center pt-4 border-t border-white/[0.06]">
+                  <div className="mb-3 sm:mb-0">
+                    <p className="text-xs text-[#64748b]">
+                      {order.shippingAddress.street}, {order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.pincode}
                     </p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-2xl font-bold text-blue-600">
-                      Total: ${order.totalPrice.toFixed(2)}
-                    </p>
-                  </div>
+                  <div className="text-lg font-bold gradient-text">${order.totalPrice.toFixed(2)}</div>
                 </div>
-              </div>
+              </motion.div>
             ))}
           </div>
         )}

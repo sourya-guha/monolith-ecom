@@ -2,9 +2,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { motion } from 'framer-motion';
 import { useCart } from '../lib/cart';
 import { userApi } from '../lib/api';
 import { useAuth } from '../lib/auth-context';
+import { CreditCard, MapPin } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,35 +24,19 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(false);
   const [hasMounted, setHasMounted] = useState(false);
   const [shippingAddress, setShippingAddress] = useState<ShippingAddress>({
-    street: '',
-    city: '',
-    state: '',
-    pincode: '',
+    street: '', city: '', state: '', pincode: '',
   });
 
-  useEffect(() => {
-    setHasMounted(true);
-  }, []);
+  useEffect(() => { setHasMounted(true); }, []);
 
   useEffect(() => {
     if (!hasMounted) return;
-
-    if (!user) {
-      router.push('/login');
-    } else if (user.role === 'seller') {
-      router.replace('/seller/dashboard');
-    } else if (cart.items.length === 0) {
-      router.push('/cart');
-    }
+    if (!user) router.push('/login');
+    else if (user.role === 'seller') router.replace('/seller/dashboard');
+    else if (cart.items.length === 0) router.push('/cart');
   }, [hasMounted, user, cart.items.length, router]);
 
-  if (!hasMounted) {
-    return null;
-  }
-
-  if (!user || cart.items.length === 0) {
-    return null;
-  }
+  if (!hasMounted || !user || cart.items.length === 0) return null;
 
   const shipping = cart.total >= 50 ? 0 : 9.99;
   const tax = cart.total * 0.08;
@@ -58,33 +44,21 @@ export default function CheckoutPage() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setShippingAddress(prev => ({
-      ...prev,
-      [name]: value,
-    }));
+    setShippingAddress(prev => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!shippingAddress.street || !shippingAddress.city || !shippingAddress.state || !shippingAddress.pincode) {
       alert('Please fill in all shipping address fields');
       return;
     }
-
     setLoading(true);
-
     try {
-      const orderData = {
-        items: cart.items.map(item => ({
-          product: item.id,
-          quantity: item.quantity,
-          price: item.price,
-        })),
+      await userApi.createOrder({
+        items: cart.items.map(item => ({ product: item.id, quantity: item.quantity, price: item.price })),
         shippingAddress,
-      };
-
-      await userApi.createOrder(orderData);
+      });
       clearCart();
       router.push('/orders?success=true');
     } catch (error) {
@@ -96,166 +70,136 @@ export default function CheckoutPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-6xl mx-auto px-6">
-        <h1 className="text-3xl font-bold text-gray-800 mb-8">Checkout</h1>
+    <div className="min-h-screen py-8 sm:py-12">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        <motion.h1
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-2xl sm:text-3xl font-bold text-white mb-8"
+        >
+          Checkout
+        </motion.h1>
 
-        <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Shipping Address */}
+        <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Left column */}
           <div className="space-y-6">
-            <div className="bg-white rounded-xl shadow-md p-6">
-              <h2 className="text-xl font-bold text-gray-800 mb-6">Shipping Address</h2>
+            {/* Shipping */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="glass-card p-6"
+            >
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#7c3aed]/20 to-[#4f46e5]/20 border border-[#7c3aed]/20 flex items-center justify-center text-[#c084fc]">
+                  <MapPin size={16} />
+                </div>
+                <h2 className="text-lg font-bold text-white">Shipping Address</h2>
+              </div>
 
               <div className="space-y-4">
                 <div>
-                  <label htmlFor="street" className="block text-sm font-medium text-gray-700 mb-1">
-                    Street Address
-                  </label>
-                  <input
-                    type="text"
-                    id="street"
-                    name="street"
-                    value={shippingAddress.street}
-                    onChange={handleInputChange}
-                    required
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
-                    placeholder="123 Main Street"
-                  />
+                  <label htmlFor="street" className="block text-xs font-medium text-[#94a3b8] mb-1.5">Street Address</label>
+                  <input type="text" id="street" name="street" value={shippingAddress.street} onChange={handleInputChange} required className="input-dark" placeholder="123 Main Street" />
                 </div>
-
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1">
-                      City
-                    </label>
-                    <input
-                      type="text"
-                      id="city"
-                      name="city"
-                      value={shippingAddress.city}
-                      onChange={handleInputChange}
-                      required
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
-                      placeholder="New York"
-                    />
+                    <label htmlFor="city" className="block text-xs font-medium text-[#94a3b8] mb-1.5">City</label>
+                    <input type="text" id="city" name="city" value={shippingAddress.city} onChange={handleInputChange} required className="input-dark" placeholder="New York" />
                   </div>
-
                   <div>
-                    <label htmlFor="state" className="block text-sm font-medium text-gray-700 mb-1">
-                      State
-                    </label>
-                    <input
-                      type="text"
-                      id="state"
-                      name="state"
-                      value={shippingAddress.state}
-                      onChange={handleInputChange}
-                      required
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
-                      placeholder="NY"
-                    />
+                    <label htmlFor="state" className="block text-xs font-medium text-[#94a3b8] mb-1.5">State</label>
+                    <input type="text" id="state" name="state" value={shippingAddress.state} onChange={handleInputChange} required className="input-dark" placeholder="NY" />
                   </div>
                 </div>
-
                 <div>
-                  <label htmlFor="pincode" className="block text-sm font-medium text-gray-700 mb-1">
-                    ZIP Code
-                  </label>
-                  <input
-                    type="text"
-                    id="pincode"
-                    name="pincode"
-                    value={shippingAddress.pincode}
-                    onChange={handleInputChange}
-                    required
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
-                    placeholder="10001"
-                  />
+                  <label htmlFor="pincode" className="block text-xs font-medium text-[#94a3b8] mb-1.5">ZIP Code</label>
+                  <input type="text" id="pincode" name="pincode" value={shippingAddress.pincode} onChange={handleInputChange} required className="input-dark" placeholder="10001" />
                 </div>
               </div>
-            </div>
+            </motion.div>
 
-            {/* Payment Method (placeholder) */}
-            <div className="bg-white rounded-xl shadow-md p-6">
-              <h2 className="text-xl font-bold text-gray-800 mb-6">Payment Method</h2>
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                <p className="text-yellow-800 text-sm">
-                  💳 Payment integration will be added in the next phase.
-                  For now, all orders will be processed as cash on delivery.
+            {/* Payment */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className="glass-card p-6"
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#7c3aed]/20 to-[#4f46e5]/20 border border-[#7c3aed]/20 flex items-center justify-center text-[#c084fc]">
+                  <CreditCard size={16} />
+                </div>
+                <h2 className="text-lg font-bold text-white">Payment</h2>
+              </div>
+              <div className="p-4 rounded-xl bg-amber-500/[0.08] border border-amber-500/20">
+                <p className="text-amber-300 text-sm">
+                  💳 Payment integration coming soon. Orders are processed as cash on delivery.
                 </p>
               </div>
-            </div>
+            </motion.div>
           </div>
 
-          {/* Order Summary */}
+          {/* Right — Order Summary */}
           <div className="space-y-6">
-            <div className="bg-white rounded-xl shadow-md p-6">
-              <h2 className="text-xl font-bold text-gray-800 mb-6">Order Summary</h2>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.15 }}
+              className="glass-card p-6 sticky top-24"
+            >
+              <h2 className="text-lg font-bold text-white mb-5">Order Summary</h2>
 
-              {/* Order Items */}
-              <div className="space-y-4 mb-6">
+              <div className="space-y-3 mb-5">
                 {cart.items.map((item) => (
-                  <div key={item.id} className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <div key={item.id} className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 bg-white/[0.03]">
                       {item.image ? (
-                        <img
-                          src={item.image}
-                          alt={item.name}
-                          className="w-full h-full object-cover rounded-lg"
-                        />
+                        <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
                       ) : (
-                        <div className="text-gray-400 text-sm">📦</div>
+                        <div className="w-full h-full flex items-center justify-center text-[#64748b] text-xs">📦</div>
                       )}
                     </div>
-                    <div className="flex-1">
-                      <h3 className="font-medium text-gray-800">{item.name}</h3>
-                      <p className="text-sm text-gray-600">Qty: {item.quantity}</p>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm font-medium text-white truncate">{item.name}</h3>
+                      <p className="text-xs text-[#64748b]">Qty: {item.quantity}</p>
                     </div>
-                    <div className="text-right">
-                      <p className="font-semibold text-gray-800">
-                        ${(item.price * item.quantity).toFixed(2)}
-                      </p>
-                    </div>
+                    <p className="text-sm font-semibold text-white">${(item.price * item.quantity).toFixed(2)}</p>
                   </div>
                 ))}
               </div>
 
-              <div className="border-t pt-4 space-y-3">
+              <div className="border-t border-white/[0.06] pt-4 space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Subtotal</span>
-                  <span className="font-semibold">${cart.total.toFixed(2)}</span>
+                  <span className="text-[#94a3b8]">Subtotal</span>
+                  <span className="text-white font-medium">${cart.total.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Shipping</span>
-                  <span className="font-semibold">
-                    {shipping === 0 ? 'Free' : `$${shipping.toFixed(2)}`}
-                  </span>
+                  <span className="text-[#94a3b8]">Shipping</span>
+                  <span className="text-white font-medium">{shipping === 0 ? <span className="text-emerald-400">Free</span> : `$${shipping.toFixed(2)}`}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">Tax</span>
-                  <span className="font-semibold">${tax.toFixed(2)}</span>
+                  <span className="text-[#94a3b8]">Tax</span>
+                  <span className="text-white font-medium">${tax.toFixed(2)}</span>
                 </div>
-                <div className="border-t pt-3">
+                <div className="border-t border-white/[0.06] pt-3">
                   <div className="flex justify-between text-lg font-bold">
-                    <span>Total</span>
-                    <span>${total.toFixed(2)}</span>
+                    <span className="text-white">Total</span>
+                    <span className="gradient-text">${total.toFixed(2)}</span>
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* Place Order Button */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-blue-600 text-white py-4 px-6 rounded-xl font-semibold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-            >
-              {loading ? 'Placing Order...' : `Place Order - $${total.toFixed(2)}`}
-            </button>
-
-            <div className="text-center text-sm text-gray-600">
-              <p>By placing your order, you agree to our terms and conditions.</p>
-            </div>
+              <button
+                type="submit"
+                disabled={loading}
+                className="btn-gradient w-full py-3.5 text-base mt-6 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? 'Placing Order...' : `Place Order — $${total.toFixed(2)}`}
+              </button>
+              <p className="text-center text-[10px] text-[#64748b] mt-3">
+                By placing your order, you agree to our terms and conditions.
+              </p>
+            </motion.div>
           </div>
         </form>
       </div>

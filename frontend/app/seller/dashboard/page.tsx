@@ -2,57 +2,35 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { motion } from 'framer-motion';
 import { useAuth } from '../../lib/auth-context';
 import { sellerApi } from '../../lib/api';
-import { Package, ShoppingCart, DollarSign, TrendingUp, Plus } from 'lucide-react';
+import { Package, ShoppingCart, DollarSign, TrendingUp, Plus, ArrowRight } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
 interface Product {
-  _id: string;
-  name: string;
-  description: string;
-  price: number;
-  category: string;
-  stock: number;
-  images: string[];
+  _id: string; name: string; description: string; price: number; category: string; stock: number; images: string[];
 }
 
 interface DashboardStats {
-  totalProducts: number;
-  totalOrders: number;
-  totalRevenue: number;
-  recentProducts: Product[];
+  totalProducts: number; totalOrders: number; totalRevenue: number; recentProducts: Product[];
 }
 
 export default function SellerDashboard() {
   const { user } = useAuth();
-  const [stats, setStats] = useState<DashboardStats>({
-    totalProducts: 0,
-    totalOrders: 0,
-    totalRevenue: 0,
-    recentProducts: [],
-  });
+  const [stats, setStats] = useState<DashboardStats>({ totalProducts: 0, totalOrders: 0, totalRevenue: 0, recentProducts: [] });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (user && user.role === 'seller') {
-      fetchDashboardData();
-    }
+    if (user && user.role === 'seller') fetchDashboardData();
   }, [user]);
 
   const fetchDashboardData = async () => {
     try {
       const productsData = (await sellerApi.getProducts()) as unknown;
       const products = Array.isArray(productsData) ? productsData : [];
-
-      // Mock stats - in a real app, you'd have a dedicated stats endpoint
-      setStats({
-        totalProducts: products.length,
-        totalOrders: 0, // Would come from API
-        totalRevenue: 0, // Would come from API
-        recentProducts: products.slice(0, 5),
-      });
+      setStats({ totalProducts: products.length, totalOrders: 0, totalRevenue: 0, recentProducts: products.slice(0, 5) });
     } catch (error) {
       console.error('Failed to fetch dashboard data:', error);
     } finally {
@@ -62,176 +40,108 @@ export default function SellerDashboard() {
 
   if (!user || user.role !== 'seller') {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="text-6xl mb-4">🚫</div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">Access Denied</h2>
-          <p className="text-gray-600">You don&apos;t have permission to access this page.</p>
+          <h2 className="text-2xl font-bold text-white mb-2">Access Denied</h2>
+          <p className="text-[#64748b]">You don&apos;t have permission to access this page.</p>
         </div>
       </div>
     );
   }
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    );
+    return <div className="min-h-screen flex items-center justify-center"><div className="spinner" /></div>;
   }
 
+  const statCards = [
+    { label: 'Products', value: stats.totalProducts, icon: <Package size={20} />, gradient: 'from-blue-500/20 to-cyan-500/20', iconColor: 'text-blue-400' },
+    { label: 'Orders', value: stats.totalOrders, icon: <ShoppingCart size={20} />, gradient: 'from-emerald-500/20 to-green-500/20', iconColor: 'text-emerald-400' },
+    { label: 'Revenue', value: `$${stats.totalRevenue.toFixed(2)}`, icon: <DollarSign size={20} />, gradient: 'from-amber-500/20 to-orange-500/20', iconColor: 'text-amber-400' },
+    { label: 'Growth', value: '+12%', icon: <TrendingUp size={20} />, gradient: 'from-purple-500/20 to-violet-500/20', iconColor: 'text-purple-400' },
+  ];
+
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-7xl mx-auto px-6">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+    <div className="min-h-screen py-8 sm:py-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-8 gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-800">Seller Dashboard</h1>
-            <p className="text-gray-600 mt-1">Welcome back, {user?.firstName}!</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-white">Seller Dashboard</h1>
+            <p className="text-sm text-[#64748b] mt-1">Welcome back, {user?.firstName}!</p>
           </div>
-          <Link
-            href="/seller/products/add"
-            className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors flex items-center gap-2"
-          >
-            <Plus size={20} />
-            Add Product
+          <Link href="/seller/products/add" className="btn-gradient py-2.5 px-5 text-sm">
+            <Plus size={16} /> Add Product
           </Link>
-        </div>
+        </motion.div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-xl shadow-md p-6">
-            <div className="flex items-center">
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <Package className="text-blue-600" size={24} />
+        {/* Stats */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          {statCards.map((s, i) => (
+            <motion.div key={s.label} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
+              className={`glass-card p-5 bg-gradient-to-br ${s.gradient}`}>
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-xl bg-white/[0.05] border border-white/[0.06] flex items-center justify-center ${s.iconColor}`}>{s.icon}</div>
+                <div>
+                  <p className="text-xs text-[#64748b]">{s.label}</p>
+                  <p className="text-xl font-bold text-white">{s.value}</p>
+                </div>
               </div>
-              <div className="ml-4">
-                <p className="text-gray-600 text-sm">Total Products</p>
-                <p className="text-2xl font-bold text-gray-800">{stats.totalProducts}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-md p-6">
-            <div className="flex items-center">
-              <div className="p-3 bg-green-100 rounded-lg">
-                <ShoppingCart className="text-green-600" size={24} />
-              </div>
-              <div className="ml-4">
-                <p className="text-gray-600 text-sm">Total Orders</p>
-                <p className="text-2xl font-bold text-gray-800">{stats.totalOrders}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-md p-6">
-            <div className="flex items-center">
-              <div className="p-3 bg-yellow-100 rounded-lg">
-                <DollarSign className="text-yellow-600" size={24} />
-              </div>
-              <div className="ml-4">
-                <p className="text-gray-600 text-sm">Total Revenue</p>
-                <p className="text-2xl font-bold text-gray-800">${stats.totalRevenue.toFixed(2)}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl shadow-md p-6">
-            <div className="flex items-center">
-              <div className="p-3 bg-purple-100 rounded-lg">
-                <TrendingUp className="text-purple-600" size={24} />
-              </div>
-              <div className="ml-4">
-                <p className="text-gray-600 text-sm">Growth</p>
-                <p className="text-2xl font-bold text-gray-800">+12%</p>
-              </div>
-            </div>
-          </div>
+            </motion.div>
+          ))}
         </div>
 
         {/* Recent Products */}
-        <div className="bg-white rounded-xl shadow-md p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-bold text-gray-800">Recent Products</h2>
-            <Link
-              href="/seller/products"
-              className="text-blue-600 hover:text-blue-700 font-medium"
-            >
-              View All
-            </Link>
+        <div className="glass-card p-6 mb-6">
+          <div className="flex items-center justify-between mb-5">
+            <h2 className="text-lg font-bold text-white">Recent Products</h2>
+            <Link href="/seller/products" className="text-xs text-[#c084fc] font-semibold hover:underline flex items-center gap-1">View All <ArrowRight size={12} /></Link>
           </div>
-
           {stats.recentProducts.length === 0 ? (
             <div className="text-center py-8">
-              <div className="text-4xl mb-4">📦</div>
-              <h3 className="text-lg font-semibold text-gray-800 mb-2">No products yet</h3>
-              <p className="text-gray-600 mb-4">Start by adding your first product.</p>
-              <Link
-                href="/seller/products/add"
-                className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
-              >
-                Add Your First Product
-              </Link>
+              <div className="text-4xl mb-3">📦</div>
+              <h3 className="text-base font-semibold text-white mb-1">No products yet</h3>
+              <p className="text-[#64748b] text-sm mb-4">Start by adding your first product.</p>
+              <Link href="/seller/products/add" className="btn-gradient py-2.5 px-6 text-sm">Add Your First Product</Link>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
               {stats.recentProducts.map((product) => (
-                <div key={product._id} className="border border-gray-200 rounded-lg p-4">
-                  <div className="h-32 bg-gray-200 rounded-lg mb-3 flex items-center justify-center">
-                    {product?.images?.length > 0 ? (
-                      <img
-                        src={product.images[0]}
-                        alt={product.name}
-                        className="w-full h-full object-cover rounded-lg"
-                      />
-                    ) : (
-                      <div className="text-gray-400 text-2xl">📦</div>
-                    )}
+                <Link key={product._id} href={`/seller/products/${product._id}`} className="group">
+                  <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3 hover:border-[#7c3aed]/30 transition-all">
+                    <div className="h-28 rounded-lg overflow-hidden bg-white/[0.03] mb-3">
+                      {product?.images?.length > 0 ? (
+                        <img src={product.images[0]} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-[#64748b] text-xl">📦</div>
+                      )}
+                    </div>
+                    <h3 className="font-semibold text-white text-sm truncate mb-1">{product.name}</h3>
+                    <p className="text-[#c084fc] font-bold text-sm">${product.price}</p>
+                    <p className="text-xs text-[#64748b]">Stock: {product?.stock}</p>
                   </div>
-                  <h3 className="font-semibold text-gray-800 mb-1 truncate">
-                    {product.name}
-                  </h3>
-                  <p className="text-blue-600 font-bold">${product.price}</p>
-                  <p className="text-sm text-gray-600">Stock: {product?.stock}</p>
-                </div>
+                </Link>
               ))}
             </div>
           )}
         </div>
 
         {/* Quick Actions */}
-        <div className="mt-8 bg-white rounded-xl shadow-md p-6">
-          <h2 className="text-xl font-bold text-gray-800 mb-6">Quick Actions</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Link
-              href="/seller/products/add"
-              className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              <Plus className="text-blue-600" size={24} />
-              <div>
-                <h3 className="font-semibold text-gray-800">Add Product</h3>
-                <p className="text-gray-600 text-sm">Create a new product listing</p>
-              </div>
-            </Link>
-
-            <Link
-              href="/seller/products"
-              className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              <Package className="text-green-600" size={24} />
-              <div>
-                <h3 className="font-semibold text-gray-800">Manage Products</h3>
-                <p className="text-gray-600 text-sm">Edit or delete your products</p>
-              </div>
-            </Link>
-
-            <div className="flex items-center gap-3 p-4 border border-gray-200 rounded-lg opacity-50 cursor-not-allowed">
-              <ShoppingCart className="text-purple-600" size={24} />
-              <div>
-                <h3 className="font-semibold text-gray-800">View Orders</h3>
-                <p className="text-gray-600 text-sm">Coming soon</p>
-              </div>
-            </div>
+        <div className="glass-card p-6">
+          <h2 className="text-lg font-bold text-white mb-4">Quick Actions</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {[
+              { href: '/seller/products/add', icon: <Plus size={20} />, title: 'Add Product', desc: 'Create a new listing', color: 'text-blue-400' },
+              { href: '/seller/products', icon: <Package size={20} />, title: 'Manage Products', desc: 'Edit or remove items', color: 'text-emerald-400' },
+              { href: '#', icon: <ShoppingCart size={20} />, title: 'View Orders', desc: 'Coming soon', color: 'text-purple-400', disabled: true },
+            ].map((a) => (
+              <Link key={a.title} href={a.href} className={`flex items-center gap-3 p-4 rounded-xl border border-white/[0.06] bg-white/[0.02] transition-all ${a.disabled ? 'opacity-40 pointer-events-none' : 'hover:border-[#7c3aed]/30 hover:bg-white/[0.04]'}`}>
+                <span className={a.color}>{a.icon}</span>
+                <div>
+                  <h3 className="text-sm font-semibold text-white">{a.title}</h3>
+                  <p className="text-xs text-[#64748b]">{a.desc}</p>
+                </div>
+              </Link>
+            ))}
           </div>
         </div>
       </div>
