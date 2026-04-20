@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../lib/auth-context';
-import { sellerApi } from '../../../lib/api';
+import { ApiError, sellerApi } from '../../../lib/api';
 import { ArrowLeft, Upload } from 'lucide-react';
 import Link from 'next/link';
 
@@ -78,7 +78,13 @@ export default function AddProduct() {
       router.push(`/seller/products/${createdProduct._id}`);
     } catch (error) {
       console.error('Failed to create product:', error);
-      alert('Failed to create product. Please try again.');
+      const message =
+        error instanceof ApiError
+          ? `${error.message}${error.status ? ` (status ${error.status})` : ''}`
+          : error instanceof Error
+            ? error.message
+            : 'Failed to create product. Please try again.';
+      alert(message);
     } finally {
       setLoading(false);
     }

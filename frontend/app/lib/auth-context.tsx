@@ -64,8 +64,24 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const login = async (email: string, password: string) => {
     try {
       const { authApi } = await import('./api');
-      const response = (await authApi.login(email, password)) as { message?: string };
-      return { otpSent: true, message: response?.message || 'OTP sent' };
+      const response = (await authApi.login(email, password)) as AuthPayload;
+      const { token: newToken, user: userData } = response;
+      const transformedUser = normalizeUser(userData) as User;
+
+      setToken(newToken);
+      setUser(transformedUser);
+
+      localStorage.setItem('token', newToken);
+      localStorage.setItem('user', JSON.stringify(transformedUser));
+
+      const roleRoutes: Record<string, string> = {
+        user: '/',
+        seller: '/seller/dashboard',
+        admin: '/admin/dashboard',
+      };
+
+      router.push(roleRoutes[userData.role] || '/');
+      return { otpSent: false, message: 'Login successful' };
     } catch (error) {
       throw error;
     }
@@ -106,24 +122,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }) => {
     try {
       const { authApi } = await import('./api');
-      const response = await authApi.register(userData);
-
-      const { token: newToken, user: newUser } = response;
-      const transformedUser = normalizeUser(newUser) as User;
-      
-      setToken(newToken);
-      setUser(transformedUser);
-
-      localStorage.setItem('token', newToken);
-      localStorage.setItem('user', JSON.stringify(transformedUser));
-
-      const roleRoutes: Record<string, string> = {
-        user: '/',
-        seller: '/seller/dashboard',
-        admin: '/admin/dashboard',
-      };
-
-      router.push(roleRoutes[newUser.role] || '/');
+      // Register now returns a message (OTP sent), not a token
+      await authApi.register(userData);
+      // Don't log in yet — the user must verify OTP first
     } catch (error) {
       throw error;
     }

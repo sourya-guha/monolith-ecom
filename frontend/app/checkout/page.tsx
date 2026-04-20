@@ -37,6 +37,8 @@ export default function CheckoutPage() {
 
     if (!user) {
       router.push('/login');
+    } else if (user.role === 'seller') {
+      router.replace('/seller/dashboard');
     } else if (cart.items.length === 0) {
       router.push('/cart');
     }

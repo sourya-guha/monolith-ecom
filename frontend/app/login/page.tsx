@@ -10,13 +10,10 @@ const LoginPage = () => {
     email: '',
     password: '',
   });
-  const [otp, setOtp] = useState('');
-  const [step, setStep] = useState<'credentials' | 'otp'>('credentials');
   const [isLoading, setIsLoading] = useState(false);
-  const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
-  const { login, verifyOtp } = useAuth();
+  const { login } = useAuth();
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData((prev) => ({
@@ -29,18 +26,9 @@ const LoginPage = () => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
-    setMessage('');
 
     try {
-      if (step === 'credentials') {
-        const response = await login(formData.email, formData.password);
-        if (response.otpSent) {
-          setStep('otp');
-          setMessage(response.message || 'OTP sent to your email.');
-        }
-      } else {
-        await verifyOtp(formData.email, otp);
-      }
+      await login(formData.email, formData.password);
     } catch (err: any) {
       setError(err.message || 'Login failed');
     } finally {
@@ -96,57 +84,27 @@ const LoginPage = () => {
             </label>
           </div>
 
-          {step === 'credentials' && (
-            <div className="relative">
-              <input
-                type="password"
-                id="password"
-                name="password"
-                value={formData.password}
-                onChange={handleInputChange}
-                placeholder=" "
-                className="border-slate-400 peer w-full h-16 px-6 pt-5 text-lg border-1 rounded-2xl focus:border-blue-500 outline-none transition-all"
-              />
-              <label
-                htmlFor="password"
-                className="absolute left-8 top-1/2 -translate-y-1/2 text-gray-400 text-lg transition-all cursor-text
+          <div className="relative">
+            <input
+              type="password"
+              id="password"
+              name="password"
+              value={formData.password}
+              onChange={handleInputChange}
+              placeholder=" "
+              className="border-slate-400 peer w-full h-16 px-6 pt-5 text-lg border-1 rounded-2xl focus:border-blue-500 outline-none transition-all"
+            />
+            <label
+              htmlFor="password"
+              className="absolute left-8 top-1/2 -translate-y-1/2 text-gray-400 text-lg transition-all cursor-text
                peer-placeholder-shown:top-1/2 peer-placeholder-shown:text-lg
                peer-focus:top-3 peer-focus:text-xs peer-focus:text-blue-500
                peer-[:not(:placeholder-shown)]:top-3 peer-[:not(:placeholder-shown)]:text-xs"
-              >
-                Password
-              </label>
-            </div>
-          )}
+            >
+              Password
+            </label>
+          </div>
 
-          {step === 'otp' && (
-            <div className="relative">
-              <input
-                type="text"
-                id="otp"
-                name="otp"
-                value={otp}
-                onChange={(e) => setOtp(e.target.value)}
-                placeholder=" "
-                className="border-slate-400 peer w-full h-16 px-6 pt-5 text-lg border-1 rounded-2xl focus:border-blue-500 outline-none transition-all"
-              />
-              <label
-                htmlFor="otp"
-                className="absolute left-8 top-1/2 -translate-y-1/2 text-gray-400 text-lg transition-all cursor-text
-               peer-placeholder-shown:top-1/2 peer-placeholder-shown:text-lg
-               peer-focus:top-3 peer-focus:text-xs peer-focus:text-blue-500
-               peer-[:not(:placeholder-shown)]:top-3 peer-[:not(:placeholder-shown)]:text-xs"
-              >
-                Enter OTP
-              </label>
-            </div>
-          )}
-
-          {message && (
-            <div className="text-green-600 text-sm text-center bg-green-50 p-2 rounded-lg">
-              {message}
-            </div>
-          )}
           {error && (
             <div className="text-red-500 text-sm text-center bg-red-50 p-2 rounded-lg">
               {error}
@@ -159,7 +117,7 @@ const LoginPage = () => {
             className="group relative w-full h-10 mt-6 bg-[#0071e3] hover:bg-[#0077ed] active:bg-[#006edb] disabled:bg-gray-400 disabled:cursor-not-allowed text-white text-xl font-small tracking-tight rounded-xl transition-all duration-300 ease-out shadow-[0_4px_14px_0_rgba(0,118,255,0.39)] hover:shadow-[0_6px_20px_rgba(0,118,255,0.23)] active:scale-[0.98] overflow-hidden pb-1"
           >
             <span className="relative z-10">
-              {isLoading ? 'Signing In...' : step === 'credentials' ? 'Send OTP' : 'Verify OTP'}
+              {isLoading ? 'Signing In...' : 'Login'}
             </span>
             <div className="absolute inset-0 h-full w-full scale-0 rounded-full transition-all duration-300 group-hover:scale-100 group-hover:bg-white/10"></div>
           </button>

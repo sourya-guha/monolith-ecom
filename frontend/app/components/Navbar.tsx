@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Handbag, Search, User, LogOut, Package, Users, BarChart3 } from 'lucide-react';
+import { Handbag, Search, LogOut, MessageCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '../lib/auth-context';
 import { useCart } from '../lib/cart';
@@ -20,24 +20,28 @@ export default function Navbar() {
     >
       {/* Logo */}
       <div className="text-xl font-bold text-gray-800">
-        <Link href="/">PROJECT-X</Link>
+        <Link href={user?.role === 'seller' ? '/seller/dashboard' : '/'}>PROJECT-X</Link>
       </div>
 
       {/* Navigation Links */}
       <div className="flex items-center gap-6">
-        <Link
-          href="/"
-          className="text-gray-600 hover:text-blue-600 font-medium transition-colors"
-        >
-          Home
-        </Link>
+        {user?.role !== 'seller' && (
+          <Link
+            href="/"
+            className="text-gray-600 hover:text-blue-600 font-medium transition-colors"
+          >
+            Home
+          </Link>
+        )}
 
-        <Link
-          href="/shop"
-          className="text-gray-600 hover:text-blue-600 font-medium transition-colors"
-        >
-          Shop
-        </Link>
+        {user?.role !== 'seller' && (
+          <Link
+            href="/shop"
+            className="text-gray-600 hover:text-blue-600 font-medium transition-colors"
+          >
+            Shop
+          </Link>
+        )}
 
         {!user ? (
           <>
@@ -50,7 +54,7 @@ export default function Navbar() {
 
             <Link
               href="/signin"
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+              className="text-gray-600 hover:text-blue-600 font-medium transition-colors"
             >
               Sign Up
             </Link>
@@ -65,6 +69,13 @@ export default function Navbar() {
                   className="text-gray-600 hover:text-blue-600 font-medium transition-colors"
                 >
                   My Orders
+                </Link>
+                <Link
+                  href="/chats"
+                  className="text-gray-600 hover:text-blue-600 font-medium transition-colors flex items-center gap-1"
+                >
+                  <MessageCircle size={16} />
+                  Chats
                 </Link>
                 <Link
                   href="/profile"
@@ -89,6 +100,19 @@ export default function Navbar() {
                   className="text-gray-600 hover:text-blue-600 font-medium transition-colors"
                 >
                   Products
+                </Link>
+                <Link
+                  href="/seller/chats"
+                  className="text-gray-600 hover:text-blue-600 font-medium transition-colors flex items-center gap-1"
+                >
+                  <MessageCircle size={16} />
+                  Chats
+                </Link>
+                <Link
+                  href="/profile"
+                  className="text-gray-600 hover:text-blue-600 font-medium transition-colors"
+                >
+                  Profile
                 </Link>
               </>
             )}
@@ -121,23 +145,27 @@ export default function Navbar() {
           </>
         )}
 
-        <Link
-          href="/shop"
-          className="text-gray-600 hover:text-blue-600 font-medium transition-colors"
-        >
-          <Search size={20} />
-        </Link>
+        {user && user.role !== 'seller' && (
+          <>
+            <Link
+              href="/shop"
+              className="text-gray-600 hover:text-blue-600 font-medium transition-colors"
+            >
+              <Search size={20} />
+            </Link>
 
-        <Link href="/cart" className="text-gray-600 hover:text-blue-600 font-medium transition-colors relative">
-          <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="relative inline-flex">
-            <Handbag size={20} />
-            {itemCount > 0 && (
-              <span className="absolute -top-2 -right-2 bg-blue-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                {itemCount}
-              </span>
-            )}
-          </motion.div>
-        </Link>
+            <Link href="/cart" className="text-gray-600 hover:text-blue-600 font-medium transition-colors relative">
+              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="relative inline-flex">
+                <Handbag size={20} />
+                {itemCount > 0 && (
+                  <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                    {itemCount}
+                  </span>
+                )}
+              </motion.div>
+            </Link>
+          </>
+        )}
 
 
       </div>

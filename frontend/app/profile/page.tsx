@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '../lib/auth-context';
-import { normalizeUser, userApi } from '../lib/api';
+import { ApiError, normalizeUser, userApi } from '../lib/api';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,6 +16,7 @@ interface UserProfile {
 
 export default function ProfilePage() {
   const { user, logout } = useAuth();
+  const router = useRouter();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
@@ -43,6 +45,13 @@ export default function ProfilePage() {
       const data = await userApi.getProfile();
       setProfile(data as UserProfile);
     } catch (error) {
+      if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        router.replace('/login');
+        return;
+      }
+
       console.error('Failed to fetch profile:', error);
     } finally {
       setLoading(false);

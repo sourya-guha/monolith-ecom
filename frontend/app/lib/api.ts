@@ -43,10 +43,33 @@ export interface OrderItemInput {
   price: number;
 }
 
-class ApiError extends Error {
-  constructor(message: string, public status?: number) {
+export class ApiError extends Error {
+  status?: number;
+
+  constructor(message: string, status?: number) {
     super(message);
     this.name = 'ApiError';
+    this.status = status;
+  }
+}
+
+async function parseResponsePayload(response: Response): Promise<unknown> {
+  const contentType = response.headers.get('content-type') || '';
+  const isJson = contentType.includes('application/json');
+
+  if (isJson) {
+    try {
+      return await response.json();
+    } catch {
+      return null;
+    }
+  }
+
+  try {
+    const text = await response.text();
+    return text || null;
+  } catch {
+    return null;
   }
 }
 
@@ -114,19 +137,20 @@ async function apiRequest<T>(
       headers: buildHeaders(requestOptions),
     });
 
-    const contentType = response.headers.get('content-type') || '';
-    const isJson = contentType.includes('application/json');
-    const payload = isJson ? await response.json() : null;
+    const payload = await parseResponsePayload(response);
 
     if (!response.ok) {
       throw new ApiError(
-        extractErrorMessage(payload, `API request failed with status ${response.status}`),
+        extractErrorMessage(
+          payload,
+          `API request to ${endpoint} failed (${response.status} ${response.statusText || 'error'})`
+        ),
         response.status
       );
     }
 
     if (isPlainObject(payload) && payload.success === false) {
-      throw new ApiError(extractErrorMessage(payload, 'Request failed'), response.status);
+      throw new ApiError(extractErrorMessage(payload, `Request to ${endpoint} failed`), response.status);
     }
 
     if (rawResponse) {
@@ -139,7 +163,7 @@ async function apiRequest<T>(
       throw error;
     }
 
-    throw new ApiError('Unable to reach the backend. Check that the API server is running.');
+    throw new ApiError(`Unable to reach the backend for ${endpoint}. Check that the API server is running.`);
   }
 }
 
@@ -329,6 +353,18 @@ export const productApi = {
 
 export const checkoutApi = {
   createOrder: userApi.createOrder,
+};
+
+export const chatApi = {
+  startForProduct: (productId: string) =>
+    apiRequest('/chat/start', {
+      method: 'POST',
+      body: JSON.stringify({ productId }),
+      unwrapKey: 'conversation',
+    }),
+  listConversations: () => apiRequest('/chat/conversations', { unwrapKey: 'conversations' }),
+  getMessages: (conversationId: string) =>
+    apiRequest(`/chat/conversations/${conversationId}/messages`, { unwrapKey: 'messages' }),
 };
 
 export { ApiError, toSearchParams };

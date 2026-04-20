@@ -2,8 +2,9 @@
 
 import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { userApi } from '../../lib/api';
+import { chatApi, userApi } from '../../lib/api';
 import { useCart } from '../../lib/cart';
+import { useAuth } from '../../lib/auth-context';
 import { Minus, Plus, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 
@@ -27,6 +28,14 @@ export default function ProductDetailPage() {
   const [quantity, setQuantity] = useState(1);
   const [selectedImage, setSelectedImage] = useState(0);
   const { addItem } = useCart();
+  const { user } = useAuth();
+  const [startingChat, setStartingChat] = useState(false);
+
+  useEffect(() => {
+    if (!user) {
+      router.replace('/login');
+    }
+  }, [user, router]);
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -40,10 +49,14 @@ export default function ProductDetailPage() {
       }
     };
 
-    if (params.id) {
+    if (user && params.id) {
       fetchProduct();
     }
-  }, [params.id]);
+  }, [params.id, user]);
+
+  if (!user) {
+    return null;
+  }
 
   const handleAddToCart = () => {
     if (!product) return;
@@ -54,6 +67,18 @@ export default function ProductDetailPage() {
       price: product.price,
       image: product.images?.[0],
     }, quantity);
+  };
+
+  const handleChatWithSeller = async () => {
+    if (!product || !user || user.role !== 'user') return;
+    setStartingChat(true);
+    try {
+      const conversation: any = await chatApi.startForProduct(product._id);
+      const id = conversation?._id || conversation?.id;
+      if (id) router.push(`/chats/${id}`);
+    } finally {
+      setStartingChat(false);
+    }
   };
 
   const updateQuantity = (newQuantity: number) => {
@@ -170,38 +195,57 @@ export default function ProductDetailPage() {
               </div>
             </div>
 
-            {/* Quantity Selector */}
-            <div className="space-y-4">
-              <div className="flex items-center gap-4">
-                <span className="font-medium text-gray-800">Quantity:</span>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => updateQuantity(quantity - 1)}
-                    disabled={quantity <= 1}
-                    className="w-10 h-10 rounded-lg border border-gray-300 flex items-center justify-center hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Minus size={16} />
-                  </button>
-                  <span className="w-12 text-center font-semibold">{quantity}</span>
-                  <button
-                    onClick={() => updateQuantity(quantity + 1)}
-                    disabled={quantity >= (product?.stock || 0)}
-                    className="w-10 h-10 rounded-lg border border-gray-300 flex items-center justify-center hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Plus size={16} />
-                  </button>
-                </div>
+            {/* Buyer-only Controls */}
+            {user?.role === 'seller' ? (
+              <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-xl text-center font-medium">
+                Sellers cannot purchase products. Please log in as a customer to shop.
               </div>
-            </div>
+            ) : (
+              <>
+                {/* Quantity Selector */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-4">
+                    <span className="font-medium text-gray-800">Quantity:</span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => updateQuantity(quantity - 1)}
+                        disabled={quantity <= 1}
+                        className="w-10 h-10 rounded-lg border border-gray-300 flex items-center justify-center hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <Minus size={16} />
+                      </button>
+                      <span className="w-12 text-center font-semibold">{quantity}</span>
+                      <button
+                        onClick={() => updateQuantity(quantity + 1)}
+                        disabled={quantity >= (product?.stock || 0)}
+                        className="w-10 h-10 rounded-lg border border-gray-300 flex items-center justify-center hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <Plus size={16} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
 
-            {/* Add to Cart Button */}
-            <button
-              onClick={handleAddToCart}
-              disabled={product?.stock === 0}
-              className="w-full bg-blue-600 text-white py-4 px-6 rounded-xl font-semibold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-            >
-              {product?.stock === 0 ? 'Out of Stock' : `Add ${quantity} to Cart - $${((product?.price || 0) * quantity).toFixed(2)}`}
-            </button>
+                {/* Add to Cart Button */}
+                <button
+                  onClick={handleAddToCart}
+                  disabled={product?.stock === 0}
+                  className="w-full bg-blue-600 text-white py-4 px-6 rounded-xl font-semibold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                >
+                  {product?.stock === 0 ? 'Out of Stock' : `Add ${quantity} to Cart - $${((product?.price || 0) * quantity).toFixed(2)}`}
+                </button>
+
+                {user?.role === 'user' && (
+                  <button
+                    onClick={handleChatWithSeller}
+                    disabled={startingChat}
+                    className="w-full mt-3 bg-white text-blue-700 py-4 px-6 rounded-xl font-semibold border border-blue-200 hover:bg-blue-50 disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {startingChat ? 'Opening chat…' : 'Chat with seller'}
+                  </button>
+                )}
+              </>
+            )}
 
             {/* Additional Info */}
             <div className="border-t pt-6 space-y-3 text-sm text-gray-600">
