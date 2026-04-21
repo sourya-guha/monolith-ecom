@@ -217,7 +217,7 @@ function toSearchParams(params?: Record<string, Primitive>) {
 
 export const authApi = {
   login: (email: string, password: string) =>
-    apiRequest('/auth/login', {
+    apiRequest<AuthPayload>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     }),
@@ -280,12 +280,6 @@ export const sellerApi = {
       method: 'POST',
       body: formData,
     }),
-  addProduct: (data: unknown) =>
-    apiRequest('/seller/products', {
-      method: 'POST',
-      body: JSON.stringify(data),
-      unwrapKey: 'product',
-    }),
   createProduct: (data: unknown) =>
     apiRequest('/seller/products', {
       method: 'POST',
@@ -337,10 +331,10 @@ export const adminApi = {
 export const productApi = {
   getAll: async (params?: ProductListParams) => userApi.getProducts(params),
   getById: (id: string) => userApi.getProduct(id),
-  getProduct: (id: string) => userApi.getProduct(id),
   getProducts: (params?: ProductListParams) => userApi.getProducts(params),
   search: async (query: string) => {
-    const products = (await userApi.getProducts()) as Array<Record<string, unknown>>;
+    const response = (await userApi.getProducts()) as PaginatedProductsResponse<Record<string, unknown>>;
+    const products = response.data;
     const normalizedQuery = query.trim().toLowerCase();
 
     if (!normalizedQuery) return products;
