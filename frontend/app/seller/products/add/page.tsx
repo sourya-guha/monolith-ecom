@@ -51,7 +51,7 @@ export default function AddProduct() {
         price: parseFloat(formData.price), category: formData.category,
         stock: parseInt(formData.stock, 10), images: imageUrls,
       })) as Product;
-      router.push(`/seller/products/${createdProduct._id}`);
+      router.push('/seller/dashboard');
     } catch (error) {
       console.error('Failed to create product:', error);
       const message = error instanceof AppApiError
