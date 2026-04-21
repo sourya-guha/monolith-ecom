@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -23,19 +23,31 @@ interface Product {
 
 export default function ShopPage() {
   const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [filtering, setFiltering] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [categories, setCategories] = useState<string[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalProducts, setTotalProducts] = useState(0);
   const PAGE_SIZE = 24;
+  const isFirstLoad = useRef(true);
 
   const { addItem } = useCart();
   const { user } = useAuth();
   const router = useRouter();
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchInput);
+      setPage(1);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   useEffect(() => {
     if (user?.role === 'seller') {
@@ -46,13 +58,18 @@ export default function ShopPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        setLoading(true);
         setLoadError(null);
+        if (isFirstLoad.current) {
+          setInitialLoading(true);
+        } else {
+          setFiltering(true);
+        }
+
         const [productResponse, categoryList] = await Promise.all([
           productApi.getProducts({
             page,
             limit: PAGE_SIZE,
-            search: searchTerm || undefined,
+            search: debouncedSearch || undefined,
             category: selectedCategory || undefined,
           }) as Promise<PaginatedProductsResponse<Product>>,
           productApi.getCategories() as Promise<string[]>
@@ -75,14 +92,16 @@ export default function ShopPage() {
         console.error('Failed to fetch shop data:', error);
         setLoadError(error instanceof Error ? error.message : 'Failed to fetch products.');
       } finally {
-        setLoading(false);
+        isFirstLoad.current = false;
+        setInitialLoading(false);
+        setFiltering(false);
       }
     };
 
     fetchData();
-  }, [page, searchTerm, selectedCategory]);
+  }, [page, debouncedSearch, selectedCategory]);
 
-  if (loading) {
+  if (initialLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="spinner" />
@@ -106,30 +125,29 @@ export default function ShopPage() {
 
           <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
             {/* Search */}
-            <div className="relative flex-1 lg:w-72">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#64748b]" size={16} />
+            <div className="relative flex-1 lg:w-80">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-[#64748b]" size={18} />
               <input
                 type="text"
                 placeholder="Search products..."
-                value={searchTerm}
-                onChange={(e) => {
-                  setSearchTerm(e.target.value);
-                  setPage(1);
-                }}
-                className="input-dark pl-10 py-2.5 text-sm"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                className="input-dark"
+                style={{ paddingLeft: '2.75rem' }}
               />
             </div>
 
             {/* Category Filter */}
-            <div className="relative">
-              <SlidersHorizontal className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#64748b] pointer-events-none" size={14} />
+            <div className="relative sm:min-w-[200px]">
+              <SlidersHorizontal className="absolute left-4 top-1/2 -translate-y-1/2 text-[#64748b] pointer-events-none" size={16} />
               <select
                 value={selectedCategory}
                 onChange={(e) => {
                   setSelectedCategory(e.target.value);
                   setPage(1);
                 }}
-                className="input-dark pl-9 pr-8 py-2.5 text-sm appearance-none cursor-pointer"
+                className="input-dark appearance-none cursor-pointer"
+                style={{ paddingLeft: '2.75rem', paddingRight: '2.5rem' }}
               >
                 <option value="">All Categories</option>
                 {categories.map(cat => (
@@ -153,7 +171,8 @@ export default function ShopPage() {
             <p className="text-[#64748b] max-w-md mx-auto text-sm">Try adjusting your search or category filter.</p>
             <button
               onClick={() => {
-                setSearchTerm('');
+                setSearchInput('');
+                setDebouncedSearch('');
                 setSelectedCategory('');
                 setPage(1);
               }}
@@ -164,6 +183,12 @@ export default function ShopPage() {
           </div>
         ) : (
           <>
+            <div className="relative">
+              {filtering && (
+                <div className="absolute inset-0 z-10 bg-[#0a0a0f]/60 backdrop-blur-[2px] rounded-2xl flex items-center justify-center">
+                  <div className="spinner" />
+                </div>
+              )}
             <motion.div layout className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
               <AnimatePresence mode='popLayout'>
                 {products.map((product) => (
@@ -222,6 +247,7 @@ export default function ShopPage() {
                 ))}
               </AnimatePresence>
             </motion.div>
+            </div>
 
             <div className="mt-8 flex items-center justify-center gap-2">
               <button
