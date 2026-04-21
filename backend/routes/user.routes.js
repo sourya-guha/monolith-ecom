@@ -6,6 +6,7 @@ const {
   getProfile,
   updateProfile,
   getAllProducts,
+  getProductCategories,
   getProduct,
   placeOrder,
   getMyOrders,
@@ -13,6 +14,7 @@ const {
 } = require('../controllers/user.controller');
 
 // Public routes — no login needed
+router.get('/products/categories', getProductCategories);
 router.get('/products', getAllProducts);
 router.get('/products/:id', getProduct);
 

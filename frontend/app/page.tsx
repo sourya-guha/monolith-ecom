@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
-import { productApi } from './lib/api';
+import { productApi, type PaginatedProductsResponse } from './lib/api';
 import { useAuth } from './lib/auth-context';
 import { ArrowRight, Sparkles, Shield, Truck } from 'lucide-react';
 
@@ -43,9 +43,9 @@ export default function HomePage() {
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const products = (await productApi.getAll()) as Product[] | unknown;
-        const productList = Array.isArray(products) ? products : [];
-        setFeaturedProducts(productList.slice(0, 6));
+        const response = (await productApi.getAll({ page: 1, limit: 6 })) as PaginatedProductsResponse<Product>;
+        const productList = Array.isArray(response?.data) ? response.data : [];
+        setFeaturedProducts(productList);
         setLoadError(null);
       } catch (error) {
         console.error('Failed to fetch products:', error);

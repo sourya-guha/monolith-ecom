@@ -43,6 +43,23 @@ export interface OrderItemInput {
   price: number;
 }
 
+export interface ProductListParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  category?: string;
+}
+
+export interface PaginatedProductsResponse<T = unknown> {
+  data: T[];
+  meta: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
 export class AppApiError extends Error {
   status?: number;
 
@@ -239,7 +256,11 @@ export const userApi = {
     apiRequest(`/user/orders/${id}/cancel`, {
       method: 'PUT',
     }),
-  getProducts: () => apiRequest('/user/products'),
+  getProducts: (params?: ProductListParams) =>
+    apiRequest<PaginatedProductsResponse>(`/user/products${toSearchParams(params as Record<string, Primitive>)}`, {
+      rawResponse: true,
+    }),
+  getProductCategories: () => apiRequest('/user/products/categories'),
   getProduct: (id: string) => apiRequest(`/user/products/${id}`),
   createOrder: (data: { items: OrderItemInput[]; shippingAddress: ShippingAddress }) =>
     apiRequest('/user/orders', {
@@ -314,19 +335,10 @@ export const adminApi = {
 };
 
 export const productApi = {
-  getAll: async (params?: Record<string, Primitive>) => {
-    const products = (await userApi.getProducts()) as Array<Record<string, unknown>>;
-    const category = String(params?.category || '').trim().toLowerCase();
-
-    if (!category) return products;
-
-    return products.filter(
-      (product) => String(product.category || '').trim().toLowerCase() === category
-    );
-  },
+  getAll: async (params?: ProductListParams) => userApi.getProducts(params),
   getById: (id: string) => userApi.getProduct(id),
   getProduct: (id: string) => userApi.getProduct(id),
-  getProducts: () => userApi.getProducts(),
+  getProducts: (params?: ProductListParams) => userApi.getProducts(params),
   search: async (query: string) => {
     const products = (await userApi.getProducts()) as Array<Record<string, unknown>>;
     const normalizedQuery = query.trim().toLowerCase();
@@ -346,8 +358,7 @@ export const productApi = {
     });
   },
   getCategories: async () => {
-    const products = (await userApi.getProducts()) as Array<Record<string, unknown>>;
-    return [...new Set(products.map((product) => String(product.category || '')).filter(Boolean))];
+    return userApi.getProductCategories();
   },
 };
 

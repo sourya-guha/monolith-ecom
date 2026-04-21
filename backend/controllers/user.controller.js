@@ -35,8 +35,51 @@ exports.updateProfile = async (req, res) => {
 // Get all products (for browsing)
 exports.getAllProducts = async (req, res) => {
   try {
-    const products = await Product.find().populate('seller', 'name email');
-    res.json({ success: true, data: products });
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 24, 1), 100);
+    const skip = (page - 1) * limit;
+    const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
+    const category = typeof req.query.category === 'string' ? req.query.category.trim() : '';
+
+    const filter = {};
+    if (search) {
+      filter.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } },
+      ];
+    }
+    if (category) {
+      filter.category = category;
+    }
+
+    const [products, total] = await Promise.all([
+      Product.find(filter)
+        .populate('seller', 'name email')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      Product.countDocuments(filter),
+    ]);
+
+    res.json({
+      success: true,
+      data: products,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.max(Math.ceil(total / limit), 1),
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+exports.getProductCategories = async (req, res) => {
+  try {
+    const categories = await Product.distinct('category', { category: { $ne: null } });
+    res.json({ success: true, data: categories.filter(Boolean).sort() });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
