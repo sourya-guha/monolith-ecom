@@ -39,7 +39,9 @@ const limiter = rateLimit({
   message: { success: false, message: 'Too many requests, please try again later.' },
 });
 
-app.use(limiter);
+if (process.env.DISABLE_LIMITER !== 'true') {
+  app.use(limiter);
+}
 
 app.get('/', (req, res) => {
   res.json({ message: 'Ecommerce API is running' });
