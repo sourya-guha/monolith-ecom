@@ -32,6 +32,8 @@ exports.updateProfile = async (req, res) => {
   }
 };
 
+const { getCache, setCache } = require('../utils/cache');
+
 // Get all products (for browsing)
 exports.getAllProducts = async (req, res) => {
   try {
@@ -40,6 +42,18 @@ exports.getAllProducts = async (req, res) => {
     const skip = (page - 1) * limit;
     const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
     const category = typeof req.query.category === 'string' ? req.query.category.trim() : '';
+
+    // Create a unique cache key
+    const cacheKey = `products:page:${page}:limit:${limit}:search:${search}:category:${category}`;
+
+    // Try to get from cache
+    const cachedData = await getCache(cacheKey);
+    if (cachedData) {
+      console.log(`[cache] HIT for ${cacheKey}`);
+      return res.json(cachedData);
+    }
+
+    console.log(`[cache] MISS for ${cacheKey} - Querying DB...`);
 
     const filter = {};
     if (search) {
@@ -61,7 +75,7 @@ exports.getAllProducts = async (req, res) => {
       Product.countDocuments(filter),
     ]);
 
-    res.json({
+    const responsePayload = {
       success: true,
       data: products,
       meta: {
@@ -70,7 +84,12 @@ exports.getAllProducts = async (req, res) => {
         total,
         totalPages: Math.max(Math.ceil(total / limit), 1),
       },
-    });
+    };
+
+    // Store in cache for 60 seconds
+    await setCache(cacheKey, responsePayload, 60);
+
+    res.json(responsePayload);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

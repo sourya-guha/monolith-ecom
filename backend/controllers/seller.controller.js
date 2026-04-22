@@ -1,5 +1,6 @@
 const Product = require('../models/Product');
 const cloudinary = require('../config/cloudinary');
+const { clearCachePattern } = require('../utils/cache');
 
 // Add product
 exports.addProduct = async (req, res) => {
@@ -15,6 +16,8 @@ exports.addProduct = async (req, res) => {
       images: Array.isArray(images) ? images : [],
       seller: req.user.id, // comes from auth middleware
     });
+
+    await clearCachePattern('products:*');
 
     res.status(201).json({ success: true, product });
   } catch (err) {
@@ -108,6 +111,8 @@ exports.updateProduct = async (req, res) => {
       { new: true }
     );
 
+    await clearCachePattern('products:*');
+
     res.json({ success: true, product: updated });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -127,6 +132,7 @@ exports.deleteProduct = async (req, res) => {
     }
 
     await Product.findByIdAndDelete(req.params.id);
+    await clearCachePattern('products:*');
     res.json({ success: true, message: 'Product deleted' });
   } catch (err) {
     res.status(500).json({ message: err.message });
