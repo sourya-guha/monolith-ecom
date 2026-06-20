@@ -6,11 +6,14 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const connectDB = require('./config/db');
 const { connectRedis } = require('./config/redis');
+const { connectKafka, produceMessage } = require('./config/kafka');
 const { verifySmtpConnection } = require('./utils/email');
 const jwt = require('jsonwebtoken');
 const { Server } = require('socket.io');
 const ChatConversation = require('./models/ChatConversation');
 const ChatMessage = require('./models/ChatMessage');
+const User = require('./models/User');
+const mongoose = require('mongoose');
 
 connectDB();
 connectRedis().catch((err) => {
@@ -114,25 +117,49 @@ io.on('connection', (socket) => {
       const isMember = String(convo.buyer) === userId || String(convo.seller) === userId;
       if (!isMember) return;
 
-      const message = await ChatMessage.create({
+      const sender = await User.findById(userId).select('name email role');
+      const optimisticMessage = {
+        _id: new mongoose.Types.ObjectId(),
         conversation: conversationId,
-        sender: userId,
+        sender: sender,
         text: messageText,
         readBy: [userId],
-      });
+        createdAt: new Date()
+      };
 
-      await ChatConversation.findByIdAndUpdate(conversationId, {
-        $set: { lastMessage: messageText, lastMessageAt: new Date() },
-      });
+      io.to(`convo:${conversationId}`).emit('chat:message', { conversationId, message: optimisticMessage });
+      if (convo.buyer) io.to(`user:${String(convo.buyer)}`).emit('chat:conversation:update', { conversationId });
+      if (convo.seller) io.to(`user:${String(convo.seller)}`).emit('chat:conversation:update', { conversationId });
 
-      const populated = await ChatMessage.findById(message._id).populate('sender', 'name email role');
-      io.to(`convo:${conversationId}`).emit('chat:message', { conversationId, message: populated });
-      io.to(`user:${String(convo.buyer)}`).emit('chat:conversation:update', { conversationId });
-      io.to(`user:${String(convo.seller)}`).emit('chat:conversation:update', { conversationId });
+      await produceMessage('chat.new_message', {
+        conversationId,
+        senderId: userId,
+        text: messageText
+      });
     } catch (err) {
       console.error('[socket] chat:send error:', err.message);
     }
   });
+});
+
+connectKafka(async (data) => {
+  const { conversationId, senderId, text, buyer, seller } = data;
+  if (conversationId && text && senderId) {
+    try {
+      const message = await ChatMessage.create({
+        conversation: conversationId,
+        sender: senderId,
+        text: text,
+        readBy: [senderId],
+      });
+
+      await ChatConversation.findByIdAndUpdate(conversationId, {
+        $set: { lastMessage: text, lastMessageAt: new Date() },
+      });
+    } catch (err) {
+      console.error('[kafka-consumer] error saving message:', err.message);
+    }
+  }
 });
 
 server.listen(port, () => console.log(`Server running on port ${port}`));
