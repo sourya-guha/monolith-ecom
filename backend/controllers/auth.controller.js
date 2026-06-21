@@ -29,20 +29,12 @@ exports.register = async (req, res) => {
 
     const normalizedEmail = email.toLowerCase().trim();
 
-    const existingUser = await User.findOne({ email: normalizedEmail });
-    if (existingUser) {
+    let user = await User.findOne({ email: normalizedEmail });
+    if (user && user.isVerified) {
       return res.status(400).json({ success: false, message: 'Email already exists' });
     }
 
-    // Create the user
-    await User.create({
-      name: name.trim(),
-      email: normalizedEmail,
-      password,
-      role,
-    });
-
-    // Generate and send OTP for email verification
+    // Generate and send OTP for email verification first
     if (!(await canRequestOtp(normalizedEmail))) {
       return res.status(429).json({
         success: false,
@@ -53,7 +45,29 @@ exports.register = async (req, res) => {
     await recordOtpRequest(normalizedEmail);
     const otp = generateOtp();
     await storeOtp(normalizedEmail, otp);
-    await sendOtpEmail(normalizedEmail, otp);
+    
+    try {
+      await sendOtpEmail(normalizedEmail, otp);
+    } catch (emailErr) {
+      console.error('[auth] email sending failed:', emailErr.message);
+      return res.status(500).json({ success: false, message: 'Failed to send OTP email. Please check server SMTP settings.' });
+    }
+
+    // Only create/update the user in the DB AFTER the email successfully sends
+    if (user && !user.isVerified) {
+      user.name = name.trim();
+      user.password = password; // Will be re-hashed by pre-save hook
+      user.role = role;
+      await user.save();
+    } else {
+      await User.create({
+        name: name.trim(),
+        email: normalizedEmail,
+        password,
+        role,
+        isVerified: false
+      });
+    }
 
     res.status(201).json({
       success: true,
@@ -82,6 +96,10 @@ exports.login = async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(400).json({ success: false, message: 'Invalid email or password' });
+    }
+
+    if (!user.isVerified) {
+      return res.status(403).json({ success: false, message: 'Please verify your email via OTP before logging in' });
     }
 
     // Login succeeds — return token directly, no OTP
@@ -131,6 +149,9 @@ exports.verifyOtp = async (req, res) => {
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
+
+    user.isVerified = true;
+    await user.save();
 
     const token = generateToken(user);
     res.json({
