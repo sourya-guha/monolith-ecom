@@ -6,8 +6,10 @@ import { motion } from 'framer-motion';
 import { chatApi, userApi } from '../../lib/api';
 import { useCart } from '../../lib/cart';
 import { useAuth } from '../../lib/auth-context';
-import { Minus, Plus, ArrowLeft, ShoppingBag, MessageCircle, Truck, RotateCcw, Headphones } from 'lucide-react';
+import { Minus, Plus, ArrowLeft, ShoppingBag, MessageCircle, Truck, RotateCcw, Headphones, Heart } from 'lucide-react';
 import Link from 'next/link';
+import { useProductTracking } from '@/lib/tracking';
+import { sendUserEventAction } from '@/app/actions/events';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,6 +34,9 @@ export default function ProductDetailPage() {
   const { user } = useAuth();
   const [startingChat, setStartingChat] = useState(false);
   const [addedToCart, setAddedToCart] = useState(false);
+
+  // Track product view with dwell time and scroll depth
+  useProductTracking(user?.id, product?._id);
 
   useEffect(() => {
     if (!user) {
@@ -67,6 +72,79 @@ export default function ProductDetailPage() {
     }, quantity);
     setAddedToCart(true);
     setTimeout(() => setAddedToCart(false), 2000);
+
+    // Get browser info
+    const getBrowser = () => {
+      if (typeof window === 'undefined') return 'unknown';
+      const ua = navigator.userAgent;
+      if (ua.includes('Chrome')) return 'Chrome';
+      if (ua.includes('Firefox')) return 'Firefox';
+      if (ua.includes('Safari') && !ua.includes('Chrome')) return 'Safari';
+      if (ua.includes('Edge')) return 'Edge';
+      return 'Other';
+    };
+
+    const commonMetadata = {
+      device: window.innerWidth < 768 ? 'mobile' : 'desktop',
+      browser: getBrowser(),
+      location: Intl.DateTimeFormat().resolvedOptions().timeZone
+    };
+
+    console.log('Add to cart clicked!', { user, product });
+
+    // Track add_to_cart event
+    if (user) {
+      console.log('Sending event to API route...');
+      fetch('/api/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        keepalive: true,
+        body: JSON.stringify({
+          userId: user.id || user._id || 'unknown',
+          productId: product._id,
+          action: 'add_to_cart',
+          metadata: commonMetadata
+        })
+      }).then(res => console.log('Fetch response:', res.status))
+        .catch(err => console.error('Fetch error:', err));
+    } else {
+      console.log('User is null, not sending event');
+    }
+  };
+
+  const handleWishlist = () => {
+    if (!product || !user?.id) return;
+    
+    // Get browser info
+    const getBrowser = () => {
+      if (typeof window === 'undefined') return 'unknown';
+      const ua = navigator.userAgent;
+      if (ua.includes('Chrome')) return 'Chrome';
+      if (ua.includes('Firefox')) return 'Firefox';
+      if (ua.includes('Safari') && !ua.includes('Chrome')) return 'Safari';
+      if (ua.includes('Edge')) return 'Edge';
+      return 'Other';
+    };
+
+    // In a real app, you would also save to DB state here.
+    // Track wishlist event
+    fetch('/api/events', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      keepalive: true,
+      body: JSON.stringify({
+        userId: user.id,
+        productId: product._id,
+        action: 'wishlist',
+        metadata: {
+          device: window.innerWidth < 768 ? 'mobile' : 'desktop',
+          browser: getBrowser(),
+          location: Intl.DateTimeFormat().resolvedOptions().timeZone
+        }
+      })
+    }).catch(console.error);
+
+    alert('Added to wishlist!');
   };
 
   const handleChatWithSeller = async () => {
@@ -231,26 +309,38 @@ export default function ProductDetailPage() {
                   </div>
                 </div>
 
-                {/* Add to Cart */}
-                <button
-                  onClick={handleAddToCart}
-                  disabled={product?.stock === 0}
-                  className={`w-full py-3.5 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${
-                    addedToCart
-                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/20'
+                {/* Action Buttons */}
+                <div className="flex items-center gap-3">
+                  {/* Add to Cart */}
+                  <button
+                    onClick={handleAddToCart}
+                    disabled={product?.stock === 0}
+                    className={`flex-1 py-3.5 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 ${
+                      addedToCart
+                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/20'
+                        : product?.stock === 0
+                          ? 'bg-white/[0.05] text-[#64748b] cursor-not-allowed border border-white/[0.06]'
+                          : 'btn-gradient text-base'
+                    }`}
+                  >
+                    <ShoppingBag size={18} />
+                    {addedToCart
+                      ? '✓ Added to Cart!'
                       : product?.stock === 0
-                        ? 'bg-white/[0.05] text-[#64748b] cursor-not-allowed border border-white/[0.06]'
-                        : 'btn-gradient text-base'
-                  }`}
-                >
-                  <ShoppingBag size={18} />
-                  {addedToCart
-                    ? '✓ Added to Cart!'
-                    : product?.stock === 0
-                      ? 'Out of Stock'
-                      : `Add ${quantity} to Cart — $${((product?.price || 0) * quantity).toFixed(2)}`
-                  }
-                </button>
+                        ? 'Out of Stock'
+                        : `Add ${quantity} to Cart — $${((product?.price || 0) * quantity).toFixed(2)}`
+                    }
+                  </button>
+
+                  {/* Wishlist */}
+                  <button
+                    onClick={handleWishlist}
+                    className="w-14 h-14 rounded-xl border border-white/[0.06] bg-white/[0.02] flex items-center justify-center text-[#94a3b8] hover:text-rose-400 hover:border-rose-400/30 hover:bg-rose-400/10 transition-all flex-shrink-0"
+                    title="Add to Wishlist"
+                  >
+                    <Heart size={20} />
+                  </button>
+                </div>
 
                 {user?.role === 'user' && (
                   <button

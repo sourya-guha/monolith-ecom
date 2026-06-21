@@ -6,6 +6,7 @@ import { normalizeUser, type AuthPayload } from './api';
 
 interface User {
   id: string;
+  _id?: string;
   firstName: string;
   lastName: string;
   name: string;

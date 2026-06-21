@@ -7,6 +7,7 @@ import { useCart } from '../lib/cart';
 import { userApi } from '../lib/api';
 import { useAuth } from '../lib/auth-context';
 import { CreditCard, MapPin } from 'lucide-react';
+import { sendUserEventAction } from '../actions/events';
 
 export const dynamic = 'force-dynamic';
 
@@ -59,6 +60,18 @@ export default function CheckoutPage() {
         items: cart.items.map(item => ({ product: item.id, quantity: item.quantity, price: item.price })),
         shippingAddress,
       });
+
+      // Track purchase events
+      if (user?.id) {
+        cart.items.forEach(item => {
+          sendUserEventAction({
+            userId: user.id,
+            productId: item.id,
+            action: 'purchase'
+          }).catch(console.error);
+        });
+      }
+
       clearCart();
       router.push('/orders?success=true');
     } catch (error) {

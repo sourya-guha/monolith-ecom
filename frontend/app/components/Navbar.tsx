@@ -37,6 +37,8 @@ export default function Navbar() {
 
     if (user?.role === 'user') {
       links.push({ href: '/orders', label: 'My Orders' });
+      links.push({ href: '/recommendations/cf', label: 'For You (CF)' });
+      links.push({ href: '/recommendations/cbf', label: 'More Like This (CBF)' });
       links.push({ href: '/chats', label: 'Chats', icon: <MessageCircle size={15} /> });
       links.push({ href: '/profile', label: 'Profile' });
     }
