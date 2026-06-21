@@ -98,9 +98,7 @@ exports.login = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid email or password' });
     }
 
-    if (!user.isVerified) {
-      return res.status(403).json({ success: false, message: 'Please verify your email via OTP before logging in' });
-    }
+
 
     // Login succeeds — return token directly, no OTP
     const token = generateToken(user);
