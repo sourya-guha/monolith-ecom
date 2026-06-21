@@ -162,4 +162,7 @@ connectKafka(async (data) => {
   }
 });
 
+const { startCronJobs } = require('./cron/scheduler');
+startCronJobs();
+
 server.listen(port, () => console.log(`Server running on port ${port}`));

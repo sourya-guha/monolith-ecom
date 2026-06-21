@@ -219,3 +219,98 @@ exports.cancelOrder = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+
+const fs = require('fs');
+const path = require('path');
+const UserFeed = require('../models/UserFeed');
+
+// Helper to dot product two arrays
+function dotProduct(vecA, vecB) {
+  let product = 0;
+  for (let i = 0; i < vecA.length; i++) {
+    product += vecA[i] * vecB[i];
+  }
+  return product;
+}
+
+exports.getCFRecommendations = async (req, res) => {
+  try {
+    console.log('Fetching CF for user:', req.user.id);
+    const userFeed = await UserFeed.findOne({ userId: req.user.id }).lean();
+    console.log('UserFeed found:', !!userFeed, 'cfEmbedding length:', userFeed?.cfEmbedding?.length);
+    if (!userFeed || !userFeed.cfEmbedding || userFeed.cfEmbedding.length === 0) {
+      return res.json({ success: true, data: [] });
+    }
+
+    const weightsManager = require('../ml/weightsManager');
+    const cfWeights = weightsManager.getCFWeights();
+    if (!cfWeights) {
+      console.log('Weights not found');
+      return res.json({ success: true, data: [] });
+    }
+
+    const { X, b, productIds } = cfWeights;
+
+    const userEmbedding = userFeed.cfEmbedding;
+    
+    let scores = [];
+    for (let i = 0; i < productIds.length; i++) {
+      const pId = productIds[i];
+      const pEmbedding = X[i];
+      const score = dotProduct(userEmbedding, pEmbedding);
+      scores.push({ productId: pId, score });
+    }
+
+    scores.sort((a, b) => b.score - a.score);
+    const top20Ids = scores.slice(0, 20).map(s => s.productId);
+
+    const products = await Product.find({ _id: { $in: top20Ids } }).lean();
+    console.log('Products found from DB:', products.length);
+    
+    const sortedProducts = top20Ids.map(id => products.find(p => String(p._id) === String(id))).filter(Boolean);
+    console.log('Sorted products length:', sortedProducts.length);
+
+    res.json({ success: true, data: sortedProducts });
+  } catch (err) {
+    console.error('getCFRecommendations error:', err);
+    res.status(500).json({ message: err.message });
+  }
+};
+
+exports.getCBFRecommendations = async (req, res) => {
+  try {
+    const userFeed = await UserFeed.findOne({ userId: req.user.id }).lean();
+    if (!userFeed || !userFeed.cbfEmbedding || userFeed.cbfEmbedding.length === 0) {
+      return res.json({ success: true, data: [] });
+    }
+
+    const weightsManager = require('../ml/weightsManager');
+    const cbfWeights = weightsManager.getCBFWeights();
+    if (!cbfWeights) {
+      return res.json({ success: true, data: [] });
+    }
+
+    const { v_m, uniqueItemIds } = cbfWeights;
+
+    const userEmbedding = userFeed.cbfEmbedding;
+    
+    let scores = [];
+    for (let i = 0; i < uniqueItemIds.length; i++) {
+      const pId = uniqueItemIds[i];
+      const pEmbedding = v_m[i];
+      const score = dotProduct(userEmbedding, pEmbedding);
+      scores.push({ productId: pId, score });
+    }
+
+    scores.sort((a, b) => b.score - a.score);
+    const top20Ids = scores.slice(0, 20).map(s => s.productId);
+
+    const products = await Product.find({ _id: { $in: top20Ids } }).lean();
+    const sortedProducts = top20Ids.map(id => products.find(p => String(p._id) === String(id))).filter(Boolean);
+
+    res.json({ success: true, data: sortedProducts });
+  } catch (err) {
+    console.error('getCBFRecommendations error:', err);
+    res.status(500).json({ message: err.message });
+  }
+};
