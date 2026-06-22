@@ -1,0 +1,6 @@
+{
+  "ignore": [
+    "ml/models/*",
+    "*.json"
+  ]
+}
