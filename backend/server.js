@@ -5,20 +5,16 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const connectDB = require('./config/db');
-const { connectRedis } = require('./config/redis');
-const { connectKafka, produceMessage } = require('./config/kafka');
+const { connectRedis, redisClient } = require('./config/redis');
+const { connectKafka, produceMessage, getKafkaStatus } = require('./config/kafka');
 const { verifySmtpConnection } = require('./utils/email');
+const { logDependencyError } = require('./utils/dependency-logger');
 const jwt = require('jsonwebtoken');
 const { Server } = require('socket.io');
 const ChatConversation = require('./models/ChatConversation');
 const ChatMessage = require('./models/ChatMessage');
 const User = require('./models/User');
 const mongoose = require('mongoose');
-
-connectDB();
-connectRedis().catch((err) => {
-  console.error('Redis connection failed:', err.message);
-});
 
 const app = express();
 const server = http.createServer(app);
@@ -33,6 +29,38 @@ app.use(helmet());
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+app.get('/health', (req, res) => {
+  const dependencies = {
+    mongodb: mongoose.connection.readyState === 1 ? 'connected' : 'unavailable',
+    redis: redisClient.isReady ? 'connected' : 'unavailable',
+    kafka: getKafkaStatus(),
+  };
+  const databaseReady = dependencies.mongodb === 'connected';
+  res.status(databaseReady ? 200 : 503).json({
+    status: databaseReady && dependencies.redis === 'connected' && dependencies.kafka === 'connected'
+      ? 'ok'
+      : 'degraded',
+    dependencies,
+  });
+});
+
+app.use('/api', (req, res, next) => {
+  if (mongoose.connection.readyState === 1) return next();
+  console.error(JSON.stringify({
+    level: 'error',
+    dependency: 'mongodb',
+    operation: 'request',
+    method: req.method,
+    path: req.originalUrl,
+    readyState: mongoose.connection.readyState,
+    message: 'Rejected database-backed request because MongoDB is not connected',
+  }));
+  return res.status(503).json({
+    success: false,
+    message: 'Database is temporarily unavailable. Please try again later.',
+  });
+});
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -60,16 +88,17 @@ app.use((req, res) => {
 });
 
 app.use((err, req, res, next) => {
-  console.error('[error]', err.stack || err.message || err);
-  res.status(err.status || 500).json({
+  const status = err.status || 500;
+  logDependencyError('http', 'request', err, {
+    method: req.method,
+    path: req.originalUrl,
+    status,
+  });
+  res.status(status).json({
     success: false,
-    message: err.message || 'Internal server error',
+    message: status < 500 ? err.message : 'Internal server error',
   });
 });
-
-verifySmtpConnection();
-
-const port = process.env.PORT || 5000;
 
 const io = new Server(server, {
   cors: corsOptions,
@@ -127,42 +156,73 @@ io.on('connection', (socket) => {
         createdAt: new Date()
       };
 
+      try {
+        await produceMessage('chat.new_message', {
+          conversationId,
+          senderId: userId,
+          text: messageText
+        });
+      } catch {
+        socket.emit('chat:error', {
+          message: 'Chat is temporarily unavailable. Your message was not sent.',
+        });
+        return;
+      }
+
       io.to(`convo:${conversationId}`).emit('chat:message', { conversationId, message: optimisticMessage });
       if (convo.buyer) io.to(`user:${String(convo.buyer)}`).emit('chat:conversation:update', { conversationId });
       if (convo.seller) io.to(`user:${String(convo.seller)}`).emit('chat:conversation:update', { conversationId });
-
-      await produceMessage('chat.new_message', {
-        conversationId,
-        senderId: userId,
-        text: messageText
-      });
     } catch (err) {
-      console.error('[socket] chat:send error:', err.message);
+      logDependencyError('chat', 'send', err, { conversationId });
+      socket.emit('chat:error', {
+        message: 'Chat is temporarily unavailable. Your message was not sent.',
+      });
     }
   });
 });
 
-connectKafka(async (data) => {
-  const { conversationId, senderId, text, buyer, seller } = data;
-  if (conversationId && text && senderId) {
+const port = process.env.PORT || 5000;
+
+async function startServer() {
+  await connectDB();
+
+  connectRedis().catch(() => {
+    console.warn('[redis] optional dependency unavailable; cache will bypass Redis');
+  });
+
+  connectKafka(async (data) => {
+    const { conversationId, senderId, text } = data;
+    if (!conversationId || !senderId || !text) {
+      const error = new Error('Chat event is missing conversationId, senderId, or text');
+      error.code = 'INVALID_CHAT_EVENT';
+      throw error;
+    }
+
     try {
-      const message = await ChatMessage.create({
+      await ChatMessage.create({
         conversation: conversationId,
         sender: senderId,
-        text: text,
+        text,
         readBy: [senderId],
       });
 
       await ChatConversation.findByIdAndUpdate(conversationId, {
         $set: { lastMessage: text, lastMessageAt: new Date() },
       });
-    } catch (err) {
-      console.error('[kafka-consumer] error saving message:', err.message);
+    } catch (error) {
+      logDependencyError('mongodb', 'persist_chat_message', error, { conversationId });
+      throw error;
     }
-  }
+  });
+
+  const { startCronJobs } = require('./cron/scheduler');
+  startCronJobs();
+  verifySmtpConnection();
+
+  server.listen(port, () => console.log(`Server running on port ${port}`));
+}
+
+startServer().catch((error) => {
+  logDependencyError('application', 'startup', error);
+  process.exitCode = 1;
 });
-
-const { startCronJobs } = require('./cron/scheduler');
-startCronJobs();
-
-server.listen(port, () => console.log(`Server running on port ${port}`));

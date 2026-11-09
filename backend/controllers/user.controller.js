@@ -1,6 +1,8 @@
 const User = require('../models/User');
 const Product = require('../models/Product');
 const Order = require('../models/Order');
+const mongoose = require('mongoose');
+const { logDependencyError } = require('../utils/dependency-logger');
 
 // Get profile
 exports.getProfile = async (req, res) => {
@@ -91,7 +93,15 @@ exports.getAllProducts = async (req, res) => {
 
     res.json(responsePayload);
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    logDependencyError('mongodb', 'list_products', err, {
+      readyState: mongoose.connection.readyState,
+    });
+    res.status(mongoose.connection.readyState === 1 ? 500 : 503).json({
+      success: false,
+      message: mongoose.connection.readyState === 1
+        ? 'Unable to load products right now.'
+        : 'Database is temporarily unavailable. Please try again later.',
+    });
   }
 };
 

@@ -1,8 +1,13 @@
 const { Kafka } = require('kafkajs');
+const { logDependencyError } = require('../utils/dependency-logger');
 
+const brokers = (process.env.KAFKA_BROKERS || 'localhost:9092')
+  .split(',')
+  .map((broker) => broker.trim())
+  .filter(Boolean);
 const kafka = new Kafka({
   clientId: process.env.KAFKA_CLIENT_ID || 'chat-service',
-  brokers: (process.env.KAFKA_BROKERS || 'localhost:9092').split(','),
+  brokers,
   ssl: { rejectUnauthorized: false },
   sasl: {
     mechanism: 'plain',
@@ -104,77 +109,138 @@ const processUserEvent = async (event) => {
     await uAnalytics.save();
 
   } catch (err) {
-    console.error('[kafka-consumer] error processing user event:', err.message);
+    logDependencyError('mongodb', 'process_kafka_user_event', err);
+    throw err;
   }
 };
 
 let isConnected = false;
+let isConnecting = false;
+let producerConnected = false;
+let chatConsumerConnected = false;
+let userEventsConsumerConnected = false;
+let chatConsumerStarted = false;
+let userEventsConsumerStarted = false;
+let retryTimer = null;
+let messageHandler = null;
+
+const scheduleKafkaReconnect = () => {
+  if (retryTimer || isConnected) return;
+  retryTimer = setTimeout(() => {
+    retryTimer = null;
+    connectKafka(messageHandler);
+  }, 30000);
+  retryTimer.unref();
+  console.warn('[kafka] connection retry scheduled in 30 seconds');
+};
 
 const connectKafka = async (onMessage) => {
-  try {
-    await producer.connect();
-    
-    // Chat Consumer
-    await consumer.connect();
-    await consumer.subscribe({ topic: 'chat.new_message', fromBeginning: false });
-    
-    await consumer.run({
-      eachMessage: async ({ topic, partition, message }) => {
-        if (topic === 'chat.new_message' && onMessage) {
-          const val = message.value.toString();
-          try {
-            const data = JSON.parse(val);
-            onMessage(data);
-          } catch(e) {
-             console.error('Failed to parse kafka message', e);
-          }
-        }
-      },
-    });
+  if (onMessage) messageHandler = onMessage;
+  if (isConnected || isConnecting) return;
 
-    // User Events Consumer
-    await userEventsConsumer.connect();
-    await userEventsConsumer.subscribe({ topic: 'user-events', fromBeginning: false });
+  isConnecting = true;
+  try {
+    if (!producerConnected) {
+      await producer.connect();
+      producerConnected = true;
+    }
     
-    await userEventsConsumer.run({
-      eachMessage: async ({ topic, partition, message }) => {
-        if (topic === 'user-events') {
-          const val = message.value.toString();
+    if (!chatConsumerConnected) {
+      await consumer.connect();
+      chatConsumerConnected = true;
+    }
+    if (!chatConsumerStarted) {
+      await consumer.subscribe({ topic: 'chat.new_message', fromBeginning: false });
+      await consumer.run({
+        eachMessage: async ({ topic, message }) => {
+          if (topic !== 'chat.new_message') return;
+          let data;
           try {
-            const data = JSON.parse(val);
-            console.log(`[kafka-consumer] Received user-event: ${data.action} for product ${data.productId}`);
-            await processUserEvent(data);
-          } catch(e) {
-             console.error('Failed to parse user event kafka message', e);
+            data = JSON.parse(message.value.toString());
+          } catch (error) {
+            logDependencyError('kafka', 'parse_chat_message', error);
+            return;
           }
-        }
-      },
-    });
+          if (messageHandler) {
+            try {
+              await messageHandler(data);
+            } catch (error) {
+              logDependencyError('kafka', 'process_chat_message', error);
+              throw error;
+            }
+          }
+        },
+      });
+      chatConsumerStarted = true;
+    }
+
+    if (!userEventsConsumerConnected) {
+      await userEventsConsumer.connect();
+      userEventsConsumerConnected = true;
+    }
+    if (!userEventsConsumerStarted) {
+      await userEventsConsumer.subscribe({ topic: 'user-events', fromBeginning: false });
+      await userEventsConsumer.run({
+        eachMessage: async ({ topic, message }) => {
+          if (topic !== 'user-events') return;
+          let data;
+          try {
+            data = JSON.parse(message.value.toString());
+          } catch (error) {
+            logDependencyError('kafka', 'parse_user_event', error);
+            return;
+          }
+          console.info(`[kafka] processing user event action=${data.action} productId=${data.productId}`);
+          await processUserEvent(data);
+        },
+      });
+      userEventsConsumerStarted = true;
+    }
 
     isConnected = true;
-    console.log('Kafka connected successfully');
+    console.info(`[kafka] connected (brokers: ${brokers.join(', ')})`);
   } catch (error) {
-    console.error('Kafka connection error:', error);
+    isConnected = false;
+    logDependencyError('kafka', 'connect', error, { brokers });
+    scheduleKafkaReconnect();
+  } finally {
+    isConnecting = false;
   }
 };
 
 const produceMessage = async (topic, message) => {
-  if (!isConnected) return;
+  if (!isConnected) {
+    const error = new Error('Kafka is not connected');
+    error.code = 'KAFKA_UNAVAILABLE';
+    logDependencyError('kafka', 'produce', error, { topic, brokers });
+    throw error;
+  }
   try {
     await producer.send({
       topic,
       messages: [{ value: JSON.stringify(message) }]
     });
   } catch (error) {
-    console.error('Kafka produce error:', error);
+    isConnected = false;
+    producerConnected = false;
+    logDependencyError('kafka', 'produce', error, { topic, brokers });
+    producer.disconnect()
+      .then(scheduleKafkaReconnect)
+      .catch((disconnectError) => {
+        logDependencyError('kafka', 'disconnect_after_produce_failure', disconnectError, { brokers });
+        scheduleKafkaReconnect();
+      });
+    throw error;
   }
 };
+
+const getKafkaStatus = () => (isConnected ? 'connected' : 'unavailable');
 
 module.exports = {
   kafka,
   producer,
   consumer,
   connectKafka,
-  produceMessage
+  produceMessage,
+  getKafkaStatus,
 };
-

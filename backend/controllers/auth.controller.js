@@ -75,6 +75,12 @@ exports.register = async (req, res) => {
     });
   } catch (err) {
     console.error('[auth] register error:', err.message);
+    if (err.code === 'REDIS_UNAVAILABLE') {
+      return res.status(503).json({
+        success: false,
+        message: 'Email verification is temporarily unavailable. Please try again later.',
+      });
+    }
     res.status(500).json({ success: false, message: err.message || 'Unable to register user' });
   }
 };
@@ -166,6 +172,12 @@ exports.verifyOtp = async (req, res) => {
     });
   } catch (err) {
     console.error('[auth] verifyOtp error:', err.message);
+    if (err.code === 'REDIS_UNAVAILABLE') {
+      return res.status(503).json({
+        success: false,
+        message: 'Email verification is temporarily unavailable. Please try again later.',
+      });
+    }
     res.status(500).json({ success: false, message: err.message || 'OTP verification failed' });
   }
 };
